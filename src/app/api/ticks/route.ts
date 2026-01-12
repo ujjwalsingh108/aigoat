@@ -24,7 +24,10 @@ export async function GET(request: Request) {
 
   if (!user || !pwd) {
     return NextResponse.json(
-      { error: "TRUEDATA_USER and TRUEDATA_PASSWORD environment variables are required" },
+      {
+        error:
+          "TRUEDATA_USER and TRUEDATA_PASSWORD environment variables are required",
+      },
       { status: 500 }
     );
   }
