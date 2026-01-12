@@ -32,7 +32,7 @@ export default function IntradayBearishPage() {
 
       // Get latest signals from last 15 minutes
       const { data: signalsData, error } = await supabase
-        .from("intraday_bearish_signals")
+        .from("bearish_breakout_nse_eq")
         .select("*")
         .gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
         .gte("probability", 0.6) // Show signals with 60%+ confidence

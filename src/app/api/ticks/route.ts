@@ -7,17 +7,6 @@ import { getAllSymbols } from "@/lib/truedata/api";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Environment-safe credentials (set in .env)
-const user = process.env.TRUEDATA_USER;
-const pwd = process.env.TRUEDATA_PASSWORD;
-const port = Number(process.env.TRUEDATA_PORT) || 8082; // Use Real Time port
-
-if (!user || !pwd) {
-  throw new Error(
-    "TRUEDATA_USER and TRUEDATA_PASSWORD environment variables are required"
-  );
-}
-
 // Track active connections
 export const connections = new Map<
   string,
@@ -28,6 +17,18 @@ export const connections = new Map<
 >();
 
 export async function GET(request: Request) {
+  // Environment-safe credentials (set in .env) - check at runtime
+  const user = process.env.TRUEDATA_USER;
+  const pwd = process.env.TRUEDATA_PASSWORD;
+  const port = Number(process.env.TRUEDATA_PORT) || 8082; // Use Real Time port
+
+  if (!user || !pwd) {
+    return NextResponse.json(
+      { error: "TRUEDATA_USER and TRUEDATA_PASSWORD environment variables are required" },
+      { status: 500 }
+    );
+  }
+
   const connectionId = Math.random().toString(36).substring(7);
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
