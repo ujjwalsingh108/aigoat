@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     ],
   },
   devIndicators: false,
+  turbopack: {},
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals = [...(config.externals || []), "truedata-nodejs"];

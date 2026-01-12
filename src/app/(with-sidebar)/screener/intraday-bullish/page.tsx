@@ -33,10 +33,9 @@ export default function IntradayBullishPage() {
 
       // Get latest signals from last 15 minutes
       const { data: signalsData, error } = await supabase
-        .from("breakout_signals")
+        .from("bullish_breakout_nse_eq")
         .select("*")
         .gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
-        .eq("signal_type", "BULLISH_BREAKOUT")
         .gte("probability", 0.6) // Show signals with 60%+ confidence
         .order("created_at", { ascending: false })
         .limit(50);
