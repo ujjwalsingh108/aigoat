@@ -116,8 +116,13 @@ async function fetchSymbolData(
 
     // Parse timestamp (format: "2024-01-05T09:15:00+0530")
     const dateTime = new Date(timestamp);
-    const date = dateTime.toISOString().split("T")[0]; // YYYY-MM-DD
-    const time = dateTime.toTimeString().split(" ")[0]; // HH:MM:SS
+
+    // Convert to IST (UTC+5:30)
+    const istDate = new Date(
+      dateTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+    );
+    const date = istDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    const time = istDate.toTimeString().split(" ")[0]; // HH:MM:SS in IST
 
     dataToInsert.push({
       symbol,
@@ -347,7 +352,9 @@ Deno.serve(async (req) => {
           totalRecords: result.totalRecords,
           failedSymbols: result.failedSymbols,
           durationMinutes: Math.round((result.duration / 60000) * 100) / 100,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date().toLocaleString("en-US", {
+            timeZone: "Asia/Kolkata",
+          }),
         },
         errors: result.errors.length > 0 ? result.errors : undefined,
       }),
