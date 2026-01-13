@@ -35,7 +35,7 @@ export default function IntradayBearishPage() {
         .from("bearish_breakout_nse_eq")
         .select("*")
         .gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
-        .gte("probability", 0.6) // Show signals with 60%+ confidence
+        .lte("probability", 0.3) // Show signals with 30% or lower confidence (bearish)
         .order("created_at", { ascending: false })
         .limit(50);
 
