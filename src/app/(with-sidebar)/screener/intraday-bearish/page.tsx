@@ -88,7 +88,7 @@ export default function IntradayBearishPage() {
               Intraday Equity Bearish
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              NIFTY 250 stocks with bearish intraday setup
+              Bearish breakout signals with high probability setups
             </p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function IntradayBearishPage() {
               <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 1
               </div>
-              <span>Part of NIFTY 250 index</span>
+              <span>All NIFTY stocks</span>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
