@@ -19,9 +19,6 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-  experimental: {
-    proxy: "./src/proxy.ts",
-  },
 };
 
 export default nextConfig;
