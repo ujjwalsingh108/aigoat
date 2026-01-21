@@ -52,11 +52,11 @@ export default function IntradayBearishPage() {
     loadBearishSignals();
   }, [loadBearishSignals]);
 
-  // Auto-refresh every 15 seconds
+  // Auto-refresh every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       loadBearishSignals();
-    }, 15000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [loadBearishSignals]);

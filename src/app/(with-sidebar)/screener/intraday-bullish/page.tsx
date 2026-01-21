@@ -53,11 +53,11 @@ export default function IntradayBullishPage() {
     loadBullishSignals();
   }, [loadBullishSignals]);
 
-  // Auto-refresh every 15 seconds
+  // Auto-refresh every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       loadBullishSignals();
-    }, 15000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [loadBullishSignals]);
