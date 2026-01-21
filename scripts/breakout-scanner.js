@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 const { KiteConnect, KiteTicker } = require("kiteconnect");
+const cache = require("./memory-cache");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -57,6 +58,16 @@ class DatabaseClient {
 
   async getNseTop1000Symbols() {
     try {
+      // Try to get from cache first (TTL: 24 hours)
+      const cacheKey = "nse_equity_symbols";
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        console.log(`✅ Loaded ${cached.length} NSE symbols from CACHE`);
+        this.firstSymbol = cached[0]?.symbol;
+        return cached;
+      }
+
       // Query all NSE equity stocks from kite_nse_equity_symbols table (2515 stocks)
       // Filter: is_active = true
       // Order by symbol alphabetically for consistent loading
@@ -68,8 +79,11 @@ class DatabaseClient {
 
       if (error) throw error;
 
+      // Cache for 24 hours (symbols rarely change)
+      cache.set(cacheKey, data, 86400);
+
       console.log(
-        `✅ Loaded ${data.length} NSE equity stocks from kite_nse_equity_symbols table`
+        `✅ Loaded ${data.length} NSE equity stocks from DATABASE (cached)`
       );
       console.log(
         `📊 Sample symbols:`,
@@ -87,6 +101,15 @@ class DatabaseClient {
 
   async getHistoricalData(symbol, candlesNeeded = 25) {
     try {
+      // Try cache first (TTL: 5 minutes)
+      const today = new Date().toISOString().split("T")[0];
+      const cacheKey = `historical:${symbol}:${today}:${candlesNeeded}`;
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+
       // Fetch last N 5-min candles
       const { data, error } = await this.supabase
         .from("historical_prices")
@@ -101,6 +124,9 @@ class DatabaseClient {
       if (error) throw error;
 
       const sortedData = (data || []).reverse();
+      
+      // Cache for 5 minutes
+      cache.set(cacheKey, sortedData, 300);
 
       if (symbol === this.firstSymbol && sortedData.length > 0) {
         console.log(`📊 Historical data for ${symbol}:`, {
@@ -125,6 +151,14 @@ class DatabaseClient {
 
   async getDailyCandles(symbol, days = 30) {
     try {
+      // Try cache first (TTL: 30 minutes)
+      const cacheKey = `daily:${symbol}:${days}`;
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+
       const daysToFetch = days + 10;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - daysToFetch);
@@ -139,6 +173,9 @@ class DatabaseClient {
         .limit(days);
 
       if (error) throw error;
+      
+      // Cache for 30 minutes
+      cache.set(cacheKey, data || [], 1800);
 
       if (symbol === this.firstSymbol && data?.length > 0) {
         console.log(`📊 Daily candles for ${symbol}:`, {

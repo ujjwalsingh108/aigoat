@@ -30,19 +30,14 @@ export default function IntradayBearishPage() {
     try {
       setIsLoading(true);
 
-      // Get latest signals from last 15 minutes
-      const { data: signalsData, error } = await supabase
-        .from("bearish_breakout_nse_eq")
-        .select("*")
-        .gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
-        .lte("probability", 0.3) // Show signals with 30% or lower confidence (bearish)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      // Use cached API route instead of direct Supabase query
+      const response = await fetch("/api/signals/bearish?minutesAgo=15&maxProbability=0.3&limit=50");
+      const result = await response.json();
 
-      if (error) {
-        console.error("Error loading bearish signals:", error);
+      if (!result.success) {
+        console.error("Error loading bearish signals:", result.error);
       } else {
-        setSignals(signalsData || []);
+        setSignals(result.signals || []);
         setLastUpdate(new Date());
       }
     } catch (err) {
@@ -50,7 +45,7 @@ export default function IntradayBearishPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   // Initial load
   useEffect(() => {

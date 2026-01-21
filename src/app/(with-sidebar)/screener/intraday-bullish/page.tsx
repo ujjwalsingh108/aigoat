@@ -31,19 +31,14 @@ export default function IntradayBullishPage() {
     try {
       setIsLoading(true);
 
-      // Get latest signals from last 15 minutes
-      const { data: signalsData, error } = await supabase
-        .from("bullish_breakout_nse_eq")
-        .select("*")
-        .gte("created_at", new Date(Date.now() - 15 * 60 * 1000).toISOString())
-        .gte("probability", 0.6) // Show signals with 60%+ confidence
-        .order("created_at", { ascending: false })
-        .limit(50);
+      // Use cached API route instead of direct Supabase query
+      const response = await fetch("/api/signals/bullish?minutesAgo=15&minProbability=0.6&limit=50");
+      const result = await response.json();
 
-      if (error) {
-        console.error("Error loading bullish signals:", error);
+      if (!result.success) {
+        console.error("Error loading bullish signals:", result.error);
       } else {
-        setSignals(signalsData || []);
+        setSignals(result.signals || []);
         setLastUpdate(new Date());
       }
     } catch (err) {
@@ -51,7 +46,7 @@ export default function IntradayBullishPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   // Initial load
   useEffect(() => {
