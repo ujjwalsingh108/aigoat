@@ -1,3 +1,37 @@
+// Chart Pattern Types
+export type PatternType = 'candlestick' | 'triangle' | 'reversal' | 'continuation';
+export type PatternDirection = 'bullish' | 'bearish' | 'neutral';
+
+export interface DetectedPattern {
+  pattern: string;
+  direction: PatternDirection;
+  confidence: number;
+  type: PatternType;
+  description: string;
+  breakoutLevel?: number;
+  target?: number;
+  poleGain?: number;
+  retracement?: number;
+}
+
+export interface PatternAnalysis {
+  detected: DetectedPattern[];
+  strongest: DetectedPattern | null;
+  aggregate_confidence: number;
+  confluence: boolean;
+  total_patterns: number;
+}
+
+export interface AIValidation {
+  status: null | 'pending' | 'completed' | 'error';
+  verdict: null | 'TRUE_POSITIVE' | 'FALSE_POSITIVE' | 'WEAK_UNCONFIRMED';
+  confidence: null | number;
+  reasoning: null | string;
+  risk_factors: null | string[];
+  entry_suggestion: null | string;
+  validated_at: null | string;
+}
+
 // Breakout Signal Interface
 export type BreakoutSignal = {
   id: number;
@@ -18,6 +52,14 @@ export type BreakoutSignal = {
   user_id?: string;
   created_by?: string;
   is_public?: boolean;
+  
+  // Pattern detection fields
+  detected_patterns?: PatternAnalysis;
+  strongest_pattern?: string | null;
+  pattern_confidence?: number | null;
+  
+  // AI validation fields
+  ai_validation?: AIValidation;
 };
 
 // Intraday Bearish Signal Interface (Optimized Schema)
@@ -38,4 +80,12 @@ export type IntradayBearishSignal = {
   confidence: number;
   created_at: string;
   created_by?: string;
+  
+  // Pattern detection fields
+  detected_patterns?: PatternAnalysis;
+  strongest_pattern?: string | null;
+  pattern_confidence?: number | null;
+  
+  // AI validation fields
+  ai_validation?: AIValidation;
 };

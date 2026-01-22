@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BreakoutSignal } from "@/types/breakout-signal";
 import { Clock } from "lucide-react";
+import { PatternDisplay } from "./PatternDisplay";
 
 interface BreakoutSignalCardProps {
   signal: BreakoutSignal;
@@ -132,6 +133,14 @@ export function BreakoutSignalCard({ signal }: BreakoutSignalCardProps) {
           <span className="text-xs font-medium">{confidence}%</span>
         </div>
         <Progress value={signal.probability * 100} className="h-2" />
+      </div>
+
+      {/* Chart Pattern Detection */}
+      <div className="mt-3 pt-3 border-t">
+        <div className="text-xs font-semibold text-muted-foreground mb-2">
+          📊 Technical Patterns
+        </div>
+        <PatternDisplay signal={signal} />
       </div>
 
       {/* Mini Technical Chart Placeholder */}

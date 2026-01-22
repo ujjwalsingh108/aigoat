@@ -2,6 +2,7 @@ require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 const { KiteConnect, KiteTicker } = require("kiteconnect");
 const cache = require("./memory-cache");
+const { PatternDetector } = require("./pattern-detector");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -212,6 +213,10 @@ class DatabaseClient {
             current_price: signal.current_price,
             created_by: "zerodha_websocket_scanner",
             is_public: true,
+            // Pattern detection fields
+            detected_patterns: signal.detected_patterns || null,
+            strongest_pattern: signal.strongest_pattern || null,
+            pattern_confidence: signal.pattern_confidence || null,
           },
         ])
         .select();
@@ -248,6 +253,10 @@ class DatabaseClient {
             current_price: signal.current_price,
             created_by: "zerodha_websocket_scanner",
             is_public: true,
+            // Pattern detection fields
+            detected_patterns: signal.detected_patterns || null,
+            strongest_pattern: signal.strongest_pattern || null,
+            pattern_confidence: signal.pattern_confidence || null,
           },
         ])
         .select();
@@ -475,6 +484,7 @@ class CandleAggregator {
 class TechnicalAnalyzer {
   constructor() {
     this.analysisLogCount = {};
+    this.patternDetector = new PatternDetector(); // Initialize pattern detector
   }
 
   calculateEMA(prices, period = 20) {
@@ -615,6 +625,34 @@ class TechnicalAnalyzer {
 
     const volumeRatio = this.calculateVolumeRatio(dailyCandles);
 
+    // ═══════════════════════════════════════════════════════════════
+    // PATTERN DETECTION (NEW)
+    // ═══════════════════════════════════════════════════════════════
+    let patternAnalysis = null;
+    try {
+      // Convert candles to format expected by pattern detector
+      const candlesForPattern = allCandles.map(c => ({
+        open: parseFloat(c.open),
+        high: parseFloat(c.high),
+        low: parseFloat(c.low),
+        close: parseFloat(c.close),
+        volume: parseInt(c.volume || 0)
+      }));
+
+      // Detect patterns
+      patternAnalysis = this.patternDetector.detectAllPatterns(candlesForPattern);
+      
+      if (patternAnalysis && patternAnalysis.strongest) {
+        console.log(`🎯 Pattern detected for ${symbol}:`, {
+          pattern: patternAnalysis.strongest.pattern,
+          direction: patternAnalysis.strongest.direction,
+          confidence: patternAnalysis.confidence
+        });
+      }
+    } catch (error) {
+      console.error(`❌ Pattern detection error for ${symbol}:`, error);
+    }
+
     return {
       symbol,
       signal_type: signalType,
@@ -629,6 +667,10 @@ class TechnicalAnalyzer {
       stop_loss: parseFloat(stopLoss.toFixed(2)),
       confidence: parseFloat(probability.toFixed(2)),
       current_price: parseFloat(currentPrice.toFixed(2)),
+      // Pattern detection fields
+      detected_patterns: patternAnalysis ? JSON.stringify(patternAnalysis) : null,
+      strongest_pattern: patternAnalysis?.strongest?.pattern || null,
+      pattern_confidence: patternAnalysis?.confidence || null,
     };
   }
 
