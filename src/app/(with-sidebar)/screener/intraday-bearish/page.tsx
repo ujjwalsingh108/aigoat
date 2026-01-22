@@ -137,7 +137,7 @@ export default function IntradayBearishPage() {
               <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 1
               </div>
-              <span>Part of NIFTY 250 index</span>
+              <span>NIFTY Equity Stocks (Approx. 2500 stocks)</span>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">

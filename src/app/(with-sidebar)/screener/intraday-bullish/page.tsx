@@ -138,7 +138,7 @@ export default function IntradayBullishPage() {
               <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
                 1
               </div>
-              <span>Part of NIFTY 500 index</span>
+              <span>NIFTY Equity Stocks (Approx. 2500 stocks)</span>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
