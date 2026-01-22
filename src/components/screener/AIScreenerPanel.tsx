@@ -15,8 +15,8 @@ interface Message {
 }
 
 interface AIScreenerPanelProps {
-  signals: BreakoutSignal[] | IntradayBearishSignal[];
-  screenerType: "bullish" | "bearish" | "swing-positional" | "swing-positional-bearish";
+  signals: BreakoutSignal[] | IntradayBearishSignal[] | any[];
+  screenerType: "bullish" | "bearish" | "swing-positional" | "swing-positional-bearish" | "intraday-index";
   onClose: () => void;
 }
 

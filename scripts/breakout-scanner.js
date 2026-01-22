@@ -345,6 +345,41 @@ class DatabaseClient {
       return null;
     }
   }
+
+  async saveIntradayIndexSignal(signal) {
+    try {
+      const { data, error } = await this.supabase
+        .from("intraday_index_signals")
+        .insert([
+          {
+            symbol: signal.symbol,
+            signal_type: signal.signal_type,
+            entry_price: signal.entry_price,
+            ema20_5min: signal.ema20_5min,
+            swing_reference_price: signal.swing_reference_price,
+            distance_from_swing: signal.distance_from_swing,
+            target1: signal.target1,
+            target2: signal.target2,
+            stop_loss: signal.stop_loss,
+            candle_time: signal.candle_time,
+            signal_direction: signal.signal_direction,
+            created_by: "intraday_index_scanner",
+            is_public: true,
+            is_active: true,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(
+        `❌ Error saving intraday index signal for ${signal.symbol}:`,
+        error
+      );
+      return null;
+    }
+  }
 }
 
 // =================================================================
@@ -580,6 +615,19 @@ class TechnicalAnalyzer {
     }
 
     return ema;
+  }
+
+  // Swing high/low detection for index strategy
+  findRecentSwingLow(candles, lookback = 10) {
+    if (!candles || candles.length < lookback) return null;
+    const recentCandles = candles.slice(-lookback);
+    return Math.min(...recentCandles.map(c => parseFloat(c.low)));
+  }
+
+  findRecentSwingHigh(candles, lookback = 10) {
+    if (!candles || candles.length < lookback) return null;
+    const recentCandles = candles.slice(-lookback);
+    return Math.max(...recentCandles.map(c => parseFloat(c.high)));
   }
 
   calculateRSI(prices, period = 14) {
@@ -922,6 +970,75 @@ class TechnicalAnalyzer {
     };
   }
 
+  analyzeIntradayIndex(symbol, historicalCandles, currentCandle) {
+    // Only for NIFTY and BANKNIFTY
+    if (symbol !== 'NIFTY' && symbol !== 'BANKNIFTY') {
+      return null;
+    }
+
+    if (!currentCandle || !historicalCandles || historicalCandles.length < 20) {
+      return null; // Need at least 20 candles for EMA20
+    }
+
+    const allCandles = [...historicalCandles, currentCandle];
+    const currentPrice = parseFloat(currentCandle.close);
+    
+    // Calculate 20 EMA on 5-minute data
+    const prices = allCandles.map(c => parseFloat(c.close));
+    const ema20 = this.calculateEMA(prices, 20);
+    
+    if (!ema20) return null;
+
+    // Find swing high and swing low (last 10 candles)
+    const swingLow = this.findRecentSwingLow(allCandles, 10);
+    const swingHigh = this.findRecentSwingHigh(allCandles, 10);
+
+    let signal = null;
+
+    // BUY LOGIC: Price > EMA20 AND within 150 points of swing low
+    if (currentPrice > ema20 && swingLow) {
+      const distanceFromSwingLow = currentPrice - swingLow;
+      
+      if (distanceFromSwingLow <= 150) {
+        signal = {
+          symbol,
+          signal_type: 'INDEX_BUY',
+          signal_direction: 'LONG',
+          entry_price: parseFloat(currentPrice.toFixed(2)),
+          ema20_5min: parseFloat(ema20.toFixed(2)),
+          swing_reference_price: parseFloat(swingLow.toFixed(2)),
+          distance_from_swing: parseFloat(distanceFromSwingLow.toFixed(2)),
+          target1: parseFloat((currentPrice + 50).toFixed(2)), // +50 points
+          target2: parseFloat((currentPrice + 75).toFixed(2)), // +75 points
+          stop_loss: parseFloat(swingLow.toFixed(2)), // Swing low as SL
+          candle_time: currentCandle.time || new Date().toISOString(),
+        };
+      }
+    }
+    // SELL LOGIC: Price < EMA20 AND within 150 points of swing high
+    else if (currentPrice < ema20 && swingHigh) {
+      const distanceFromSwingHigh = swingHigh - currentPrice;
+      
+      if (distanceFromSwingHigh <= 150) {
+        signal = {
+          symbol,
+          signal_type: 'INDEX_SELL',
+          signal_direction: 'SHORT',
+          entry_price: parseFloat(currentPrice.toFixed(2)),
+          ema20_5min: parseFloat(ema20.toFixed(2)),
+          swing_reference_price: parseFloat(swingHigh.toFixed(2)),
+          distance_from_swing: parseFloat(distanceFromSwingHigh.toFixed(2)),
+          target1: parseFloat((currentPrice - 50).toFixed(2)), // -50 points
+          target2: parseFloat((currentPrice - 75).toFixed(2)), // -75 points
+          stop_loss: parseFloat(swingHigh.toFixed(2)), // Swing high as SL
+          candle_time: currentCandle.time || new Date().toISOString(),
+        };
+      }
+    }
+
+    return signal;
+  }
+
   checkVolumeCondition(candles) {
     try {
       const dailyVolumes = {};
@@ -1122,7 +1239,17 @@ class EnhancedBreakoutScanner {
       currentPrice
     );
 
-    if (!signal && !swingSignal && !swingBearishSignal) return;
+    // Run intraday index analysis (NIFTY/BANKNIFTY only)
+    let indexSignal = null;
+    if (symbol === 'NIFTY' || symbol === 'BANKNIFTY') {
+      indexSignal = this.analyzer.analyzeIntradayIndex(
+        symbol,
+        historical,
+        currentCandle
+      );
+    }
+
+    if (!signal && !swingSignal && !swingBearishSignal && !indexSignal) return;
 
     // Check if it's a bullish breakout signal
     if (
@@ -1212,6 +1339,27 @@ class EnhancedBreakoutScanner {
             `📉 SWING BEARISH SAVED: ${symbol} - ${swingBearishSignal.signal_type} (${(
               swingBearishSignal.probability * 100
             ).toFixed(0)}% confidence) @ ₹${swingBearishSignal.current_price}`
+          );
+        }
+      }
+    }
+
+    // Check if it's an intraday index signal (NIFTY/BANKNIFTY)
+    if (indexSignal) {
+      const lastIndexSignal = this.lastIndexSignalTime?.get(symbol);
+      const now = Date.now();
+
+      // Save index signals once per 5-minute candle (avoid duplicates)
+      if (!lastIndexSignal || now - lastIndexSignal > 5 * 60 * 1000) {
+        const saved = await this.db.saveIntradayIndexSignal(indexSignal);
+
+        if (saved) {
+          if (!this.lastIndexSignalTime) {
+            this.lastIndexSignalTime = new Map();
+          }
+          this.lastIndexSignalTime.set(symbol, now);
+          console.log(
+            `📊 INDEX SIGNAL SAVED: ${symbol} - ${indexSignal.signal_type} @ ${indexSignal.entry_price} (${indexSignal.signal_direction})`
           );
         }
       }

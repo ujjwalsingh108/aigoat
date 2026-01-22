@@ -30,6 +30,7 @@ export const CACHE_KEYS = {
   BEARISH_SIGNALS: 'signals:bearish',
   SWING_POSITIONAL_SIGNALS: 'signals:swing-positional',
   SWING_POSITIONAL_BEARISH_SIGNALS: 'signals:swing-positional-bearish',
+  INTRADAY_INDEX_SIGNALS: 'signals:intraday-index',
   NSE_SYMBOLS: 'symbols:nse',
   KITE_TOKEN: 'kite:token',
   DAILY_CANDLES: 'historical:daily',
@@ -180,7 +181,7 @@ export function buildDailyCandleKey(symbol: string, days: number): string {
  * Helper: Build cache key for signals
  */
 export function buildSignalKey(
-  type: 'bullish' | 'bearish' | 'swing-positional' | 'swing-positional-bearish',
+  type: 'bullish' | 'bearish' | 'swing-positional' | 'swing-positional-bearish' | 'intraday-index',
   minutesAgo: number = 15
 ): string {
   let prefix: string;
@@ -190,8 +191,10 @@ export function buildSignalKey(
     prefix = CACHE_KEYS.BEARISH_SIGNALS;
   } else if (type === 'swing-positional') {
     prefix = CACHE_KEYS.SWING_POSITIONAL_SIGNALS;
-  } else {
+  } else if (type === 'swing-positional-bearish') {
     prefix = CACHE_KEYS.SWING_POSITIONAL_BEARISH_SIGNALS;
+  } else {
+    prefix = CACHE_KEYS.INTRADAY_INDEX_SIGNALS;
   }
   return `${prefix}:${minutesAgo}min`;
 }

@@ -6,8 +6,8 @@ import { useAuthUser } from "@/hooks/use-auth-user";
 import { BreakoutSignal, IntradayBearishSignal } from "@/types/breakout-signal";
 
 interface AIScreenerButtonProps {
-  signals: BreakoutSignal[] | IntradayBearishSignal[];
-  screenerType: "bullish" | "bearish" | "swing-positional" | "swing-positional-bearish";
+  signals: BreakoutSignal[] | IntradayBearishSignal[] | any[];
+  screenerType: "bullish" | "bearish" | "swing-positional" | "swing-positional-bearish" | "intraday-index";
   onOpenPanel: () => void;
   isLoading?: boolean;
 }

@@ -94,6 +94,17 @@ export default function Screener() {
         },
       ],
     },
+    {
+      title: "Indices",
+      items: [
+        {
+          label: "Intraday Index (NIFTY / BANKNIFTY)",
+          tags: ["Buy/Sell"],
+          symbols: 0,
+          image: "/images/stocks-bullish-tomorrow.jpg",
+        },
+      ],
+    },
   ];
 
   const handleButtonClick = () => {
