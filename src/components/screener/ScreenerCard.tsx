@@ -24,6 +24,8 @@ export function ScreenerCard({
       router.push(`/screener/intraday-bearish`);
     } else if (label === "Swing Positional Equity Bullish (1-15 days)") {
       router.push(`/screener/swing-positional-bullish`);
+    } else if (label === "Swing Positional Equity Bearish (1-15 days)") {
+      router.push(`/screener/swing-positional-bearish`);
     } else {
       // Other strategies - no route yet
       console.log(`Strategy not implemented: ${label}`);

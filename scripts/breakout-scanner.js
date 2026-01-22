@@ -308,6 +308,43 @@ class DatabaseClient {
       return null;
     }
   }
+
+  async saveSwingPositionalBearishSignal(signal) {
+    try {
+      const { data, error } = await this.supabase
+        .from("swing_positional_bearish")
+        .insert([
+          {
+            symbol: signal.symbol,
+            signal_type: signal.signal_type,
+            probability: signal.probability,
+            criteria_met: signal.criteria_met,
+            daily_ema20: signal.daily_ema20,
+            daily_sma50: signal.daily_sma50,
+            rsi_value: signal.rsi_value,
+            volume_ratio: signal.volume_ratio,
+            weekly_volatility: signal.weekly_volatility,
+            predicted_direction: signal.predicted_direction,
+            target_price: signal.target_price,
+            stop_loss: signal.stop_loss,
+            confidence: signal.confidence,
+            current_price: signal.current_price,
+            created_by: "zerodha_websocket_scanner",
+            is_public: true,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(
+        `❌ Error saving swing bearish signal for ${signal.symbol}:`,
+        error
+      );
+      return null;
+    }
+  }
 }
 
 // =================================================================
@@ -816,6 +853,75 @@ class TechnicalAnalyzer {
     };
   }
 
+  analyzeSwingPositionalBearish(symbol, dailyCandles, currentPrice) {
+    // Need at least 365 days for yearly volume, but work with what we have
+    if (!dailyCandles || dailyCandles.length < 50) {
+      return null; // Minimum 50 days for SMA50
+    }
+
+    // 1. Universe: Already filtered (2500 stocks loaded)
+    const universeFilter = true;
+
+    // 2. Trend: Price BELOW 20 EMA & 50 SMA (Daily) - INVERTED FROM BULLISH
+    const dailyPrices = dailyCandles.map(c => parseFloat(c.close));
+    const dailyEMA20 = this.calculateEMA(dailyPrices, 20);
+    const dailySMA50 = this.calculateSMA(dailyPrices, 50);
+    const trendFilter = 
+      dailyEMA20 && dailySMA50 && 
+      currentPrice < dailyEMA20 && 
+      currentPrice < dailySMA50;
+
+    // 3. Momentum: RSI < 50 && > 20 (Daily) - INVERTED FROM BULLISH
+    const dailyRSI = this.calculateRSI(dailyPrices, 14);
+    const momentumFilter = dailyRSI && dailyRSI < 50 && dailyRSI > 20;
+
+    // 4. Volume: 2x yearly average (same as bullish)
+    const volumeFilter = this.checkYearlyVolume(dailyCandles);
+
+    // 5. Volatility: 1-5% weekly movement (same as bullish, direction-agnostic)
+    const weeklyVolatility = this.calculateWeeklyVolatility(dailyCandles);
+    const volatilityFilter = weeklyVolatility >= 1 && weeklyVolatility <= 5;
+
+    // 6. Market Cap: Top 2500 (already satisfied by universe filter)
+    const marketCapFilter = true;
+
+    const criteriaResults = [
+      universeFilter,
+      trendFilter,
+      momentumFilter,
+      volumeFilter,
+      volatilityFilter,
+      marketCapFilter,
+    ];
+
+    const criteriaMet = criteriaResults.filter(Boolean).length;
+    const probability = criteriaMet / 6;
+
+    // Only return signals with 5-6 criteria met (high confidence for swing)
+    if (criteriaMet < 5) {
+      return null;
+    }
+
+    const volumeRatio = this.calculateYearlyVolumeRatio(dailyCandles);
+
+    return {
+      symbol,
+      signal_type: "SWING_POSITIONAL_BEARISH",
+      probability: parseFloat(probability.toFixed(2)),
+      criteria_met: criteriaMet,
+      daily_ema20: dailyEMA20 ? parseFloat(dailyEMA20.toFixed(2)) : null,
+      daily_sma50: dailySMA50 ? parseFloat(dailySMA50.toFixed(2)) : null,
+      rsi_value: dailyRSI ? parseFloat(dailyRSI.toFixed(2)) : null,
+      volume_ratio: parseFloat(volumeRatio.toFixed(2)),
+      weekly_volatility: parseFloat(weeklyVolatility.toFixed(2)),
+      predicted_direction: "DOWN",
+      target_price: parseFloat((currentPrice * 0.95).toFixed(2)), // -5% target for bearish swing
+      stop_loss: parseFloat((currentPrice * 1.03).toFixed(2)), // +3% stop loss for bearish
+      confidence: parseFloat(probability.toFixed(2)),
+      current_price: parseFloat(currentPrice.toFixed(2)),
+    };
+  }
+
   checkVolumeCondition(candles) {
     try {
       const dailyVolumes = {};
@@ -1009,7 +1115,14 @@ class EnhancedBreakoutScanner {
       currentPrice
     );
 
-    if (!signal && !swingSignal) return;
+    // Run swing positional bearish analysis (new logic)
+    const swingBearishSignal = this.analyzer.analyzeSwingPositionalBearish(
+      symbol,
+      daily,
+      currentPrice
+    );
+
+    if (!signal && !swingSignal && !swingBearishSignal) return;
 
     // Check if it's a bullish breakout signal
     if (
@@ -1076,6 +1189,29 @@ class EnhancedBreakoutScanner {
             `📅 SWING POSITIONAL SAVED: ${symbol} - ${swingSignal.signal_type} (${(
               swingSignal.probability * 100
             ).toFixed(0)}% confidence) @ ₹${swingSignal.current_price}`
+          );
+        }
+      }
+    }
+
+    // Check if it's a swing positional bearish signal (new logic)
+    if (swingBearishSignal && swingBearishSignal.criteria_met >= 5) {
+      const lastSwingBearishSignal = this.lastSwingBearishSignalTime?.get(symbol);
+      const now = Date.now();
+
+      // Save swing bearish signals less frequently (once per hour)
+      if (!lastSwingBearishSignal || now - lastSwingBearishSignal > 60 * 60 * 1000) {
+        const saved = await this.db.saveSwingPositionalBearishSignal(swingBearishSignal);
+
+        if (saved) {
+          if (!this.lastSwingBearishSignalTime) {
+            this.lastSwingBearishSignalTime = new Map();
+          }
+          this.lastSwingBearishSignalTime.set(symbol, now);
+          console.log(
+            `📉 SWING BEARISH SAVED: ${symbol} - ${swingBearishSignal.signal_type} (${(
+              swingBearishSignal.probability * 100
+            ).toFixed(0)}% confidence) @ ₹${swingBearishSignal.current_price}`
           );
         }
       }
