@@ -103,6 +103,12 @@ export default function Screener() {
           symbols: 0,
           image: "/images/stocks-bullish-tomorrow.jpg",
         },
+        {
+          label: "Swing Positional Index (NIFTY / BANKNIFTY)",
+          tags: ["Long/Short"],
+          symbols: 0,
+          image: "/images/stocks-bullish-month.jpg",
+        },
       ],
     },
   ];

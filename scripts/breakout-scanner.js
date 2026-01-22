@@ -192,6 +192,158 @@ class DatabaseClient {
     }
   }
 
+  async getHourlyCandles(symbol, candles = 30) {
+    try {
+      // For hourly candles, we aggregate 5-minute data
+      // Fetch enough 5-min candles to create hourly (12 * candles = 5-min candles needed)
+      const fiveMinCandlesNeeded = candles * 12 + 12; // Extra for safety
+      
+      const cacheKey = `hourly:${symbol}:${candles}`;
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+
+      const { data, error } = await this.supabase
+        .from("historical_prices")
+        .select("date, time, open, high, low, close, volume")
+        .eq("symbol", symbol)
+        .gte("time", "09:15")
+        .lte("time", "15:30")
+        .order("date", { ascending: false })
+        .order("time", { ascending: false })
+        .limit(fiveMinCandlesNeeded);
+
+      if (error) throw error;
+
+      // Aggregate into hourly candles
+      const sortedData = (data || []).reverse();
+      const hourlyCandles = this.aggregateToHourly(sortedData).slice(-candles);
+      
+      // Cache for 10 minutes
+      cache.set(cacheKey, hourlyCandles, 600);
+
+      return hourlyCandles;
+    } catch (error) {
+      console.error(`❌ Error fetching hourly candles for ${symbol}:`, error);
+      return [];
+    }
+  }
+
+  async getFourHourCandles(symbol, candles = 30) {
+    try {
+      // For 4-hour candles, we aggregate 5-minute data
+      // Fetch enough 5-min candles (48 * candles = 5-min candles needed for 4H)
+      const fiveMinCandlesNeeded = candles * 48 + 48; // Extra for safety
+      
+      const cacheKey = `fourhour:${symbol}:${candles}`;
+      const cached = cache.get(cacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+
+      const { data, error } = await this.supabase
+        .from("historical_prices")
+        .select("date, time, open, high, low, close, volume")
+        .eq("symbol", symbol)
+        .gte("time", "09:15")
+        .lte("time", "15:30")
+        .order("date", { ascending: false })
+        .order("time", { ascending: false })
+        .limit(fiveMinCandlesNeeded);
+
+      if (error) throw error;
+
+      // Aggregate into 4-hour candles
+      const sortedData = (data || []).reverse();
+      const fourHourCandles = this.aggregateToFourHour(sortedData).slice(-candles);
+      
+      // Cache for 10 minutes
+      cache.set(cacheKey, fourHourCandles, 600);
+
+      return fourHourCandles;
+    } catch (error) {
+      console.error(`❌ Error fetching 4-hour candles for ${symbol}:`, error);
+      return [];
+    }
+  }
+
+  aggregateToHourly(fiveMinCandles) {
+    const hourlyCandles = [];
+    let currentHourCandles = [];
+    let currentHour = null;
+
+    fiveMinCandles.forEach(candle => {
+      const hour = candle.time.substring(0, 2); // Extract hour from time (HH:MM format)
+      
+      if (currentHour !== hour) {
+        if (currentHourCandles.length > 0) {
+          hourlyCandles.push(this.aggregateCandles(currentHourCandles));
+        }
+        currentHourCandles = [candle];
+        currentHour = hour;
+      } else {
+        currentHourCandles.push(candle);
+      }
+    });
+
+    // Add last hour
+    if (currentHourCandles.length > 0) {
+      hourlyCandles.push(this.aggregateCandles(currentHourCandles));
+    }
+
+    return hourlyCandles;
+  }
+
+  aggregateToFourHour(fiveMinCandles) {
+    // Market hours: 9:15 - 15:30
+    // We'll create 4-hour buckets: 9:15-13:15, 13:15-15:30 (adjusted for market)
+    const fourHourCandles = [];
+    let bucket1 = []; // 9:15 - 13:15
+    let bucket2 = []; // 13:15 - 15:30
+    let currentDate = null;
+
+    fiveMinCandles.forEach(candle => {
+      if (currentDate !== candle.date) {
+        // New day - save previous buckets
+        if (bucket1.length > 0) fourHourCandles.push(this.aggregateCandles(bucket1));
+        if (bucket2.length > 0) fourHourCandles.push(this.aggregateCandles(bucket2));
+        bucket1 = [];
+        bucket2 = [];
+        currentDate = candle.date;
+      }
+
+      const time = candle.time;
+      if (time < "13:15") {
+        bucket1.push(candle);
+      } else {
+        bucket2.push(candle);
+      }
+    });
+
+    // Add remaining buckets
+    if (bucket1.length > 0) fourHourCandles.push(this.aggregateCandles(bucket1));
+    if (bucket2.length > 0) fourHourCandles.push(this.aggregateCandles(bucket2));
+
+    return fourHourCandles;
+  }
+
+  aggregateCandles(candles) {
+    if (candles.length === 0) return null;
+    
+    return {
+      date: candles[0].date,
+      time: candles[0].time,
+      open: parseFloat(candles[0].open),
+      high: Math.max(...candles.map(c => parseFloat(c.high))),
+      low: Math.min(...candles.map(c => parseFloat(c.low))),
+      close: parseFloat(candles[candles.length - 1].close),
+      volume: candles.reduce((sum, c) => sum + parseInt(c.volume || 0), 0),
+    };
+  }
+
   async saveBreakoutSignal(signal) {
     try {
       const { data, error } = await this.supabase
@@ -375,6 +527,51 @@ class DatabaseClient {
     } catch (error) {
       console.error(
         `❌ Error saving intraday index signal for ${signal.symbol}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  async saveSwingPositionalIndexSignal(signal) {
+    try {
+      // First, deactivate any existing active signals for this symbol and direction
+      await this.supabase
+        .from("swing_positional_index_signals")
+        .update({ is_active: false })
+        .eq("symbol", signal.symbol)
+        .eq("signal_direction", signal.signal_direction)
+        .eq("is_active", true);
+
+      const { data, error } = await this.supabase
+        .from("swing_positional_index_signals")
+        .insert([
+          {
+            symbol: signal.symbol,
+            signal_type: signal.signal_type,
+            signal_direction: signal.signal_direction,
+            entry_price: signal.entry_price,
+            ema20_1h: signal.ema20_1h,
+            ema20_4h: signal.ema20_4h,
+            ema20_1d: signal.ema20_1d,
+            rsi9_daily: signal.rsi9_daily,
+            rsi14_daily: signal.rsi14_daily,
+            is_above_ema_1h: signal.is_above_ema_1h,
+            is_above_ema_4h: signal.is_above_ema_4h,
+            is_above_ema_1d: signal.is_above_ema_1d,
+            signal_start_date: signal.signal_start_date,
+            signal_age_days: 0,
+            daily_candle_time: signal.daily_candle_time,
+            is_active: true,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(
+        `❌ Error saving swing index signal for ${signal.symbol}:`,
         error
       );
       return null;
@@ -1039,6 +1236,105 @@ class TechnicalAnalyzer {
     return signal;
   }
 
+  analyzeSwingPositionalIndex(symbol, hourlyCandles, fourHourCandles, dailyCandles) {
+    // Only for NIFTY and BANKNIFTY
+    if (symbol !== 'NIFTY' && symbol !== 'BANKNIFTY') {
+      return null;
+    }
+
+    // Validate we have enough candles for all timeframes
+    if (!dailyCandles || dailyCandles.length < 20) {
+      return null; // Need at least 20 candles for EMA20
+    }
+    if (!hourlyCandles || hourlyCandles.length < 20) {
+      return null;
+    }
+    if (!fourHourCandles || fourHourCandles.length < 20) {
+      return null;
+    }
+
+    // Get current price from latest daily candle
+    const currentPrice = parseFloat(dailyCandles[dailyCandles.length - 1].close);
+
+    // Calculate 20 EMA for all timeframes
+    const prices1h = hourlyCandles.map(c => parseFloat(c.close));
+    const prices4h = fourHourCandles.map(c => parseFloat(c.close));
+    const pricesDaily = dailyCandles.map(c => parseFloat(c.close));
+
+    const ema20_1h = this.calculateEMA(prices1h, 20);
+    const ema20_4h = this.calculateEMA(prices4h, 20);
+    const ema20_1d = this.calculateEMA(pricesDaily, 20);
+
+    if (!ema20_1h || !ema20_4h || !ema20_1d) {
+      return null;
+    }
+
+    // Calculate Daily RSI (9 and 14 periods)
+    const rsi9_daily = this.calculateRSI(pricesDaily, 9);
+    const rsi14_daily = this.calculateRSI(pricesDaily, 14);
+
+    if (!rsi14_daily) {
+      return null; // RSI14 is mandatory
+    }
+
+    // Check EMA alignment status
+    const price1h = parseFloat(hourlyCandles[hourlyCandles.length - 1].close);
+    const price4h = parseFloat(fourHourCandles[fourHourCandles.length - 1].close);
+    
+    const isAboveEma1h = price1h > ema20_1h;
+    const isAboveEma4h = price4h > ema20_4h;
+    const isAboveEma1d = currentPrice > ema20_1d;
+
+    const dailyCandleTime = dailyCandles[dailyCandles.length - 1].date || new Date().toISOString().split('T')[0];
+
+    let signal = null;
+
+    // LONG LOGIC: All EMAs bullish + RSI between 50-80
+    if (isAboveEma1h && isAboveEma4h && isAboveEma1d) {
+      if (rsi14_daily >= 50 && rsi14_daily <= 80) {
+        signal = {
+          symbol,
+          signal_type: 'SWING_INDEX_BUY',
+          signal_direction: 'LONG',
+          entry_price: parseFloat(currentPrice.toFixed(2)),
+          ema20_1h: parseFloat(ema20_1h.toFixed(2)),
+          ema20_4h: parseFloat(ema20_4h.toFixed(2)),
+          ema20_1d: parseFloat(ema20_1d.toFixed(2)),
+          rsi9_daily: rsi9_daily ? parseFloat(rsi9_daily.toFixed(2)) : null,
+          rsi14_daily: parseFloat(rsi14_daily.toFixed(2)),
+          is_above_ema_1h: true,
+          is_above_ema_4h: true,
+          is_above_ema_1d: true,
+          signal_start_date: dailyCandleTime,
+          daily_candle_time: dailyCandleTime,
+        };
+      }
+    }
+    // SHORT LOGIC: All EMAs bearish + RSI between 20-50
+    else if (!isAboveEma1h && !isAboveEma4h && !isAboveEma1d) {
+      if (rsi14_daily >= 20 && rsi14_daily < 50) {
+        signal = {
+          symbol,
+          signal_type: 'SWING_INDEX_SELL',
+          signal_direction: 'SHORT',
+          entry_price: parseFloat(currentPrice.toFixed(2)),
+          ema20_1h: parseFloat(ema20_1h.toFixed(2)),
+          ema20_4h: parseFloat(ema20_4h.toFixed(2)),
+          ema20_1d: parseFloat(ema20_1d.toFixed(2)),
+          rsi9_daily: rsi9_daily ? parseFloat(rsi9_daily.toFixed(2)) : null,
+          rsi14_daily: parseFloat(rsi14_daily.toFixed(2)),
+          is_above_ema_1h: false,
+          is_above_ema_4h: false,
+          is_above_ema_1d: false,
+          signal_start_date: dailyCandleTime,
+          daily_candle_time: dailyCandleTime,
+        };
+      }
+    }
+
+    return signal;
+  }
+
   checkVolumeCondition(candles) {
     try {
       const dailyVolumes = {};
@@ -1143,15 +1439,35 @@ class EnhancedBreakoutScanner {
     const promises = this.symbols.map(async (symbolData) => {
       const symbol = symbolData.symbol;
 
-      const [historical, daily] = await Promise.all([
-        this.db.getHistoricalData(symbol, CONFIG.EMA_PERIOD + 5),
-        this.db.getDailyCandles(symbol, 365), // Load 365 days for yearly volume calculation
-      ]);
+      // For NIFTY/BANKNIFTY, load multi-timeframe data for swing index strategy
+      if (symbol === 'NIFTY' || symbol === 'BANKNIFTY') {
+        const [historical, daily, hourly, fourHour] = await Promise.all([
+          this.db.getHistoricalData(symbol, CONFIG.EMA_PERIOD + 5),
+          this.db.getDailyCandles(symbol, 365),
+          this.db.getHourlyCandles(symbol, 30),
+          this.db.getFourHourCandles(symbol, 30),
+        ]);
 
-      this.historicalData.set(symbol, historical);
-      this.dailyCandles.set(symbol, daily);
-      this.candleAggregators.set(symbol, new CandleAggregator(symbol));
-      this.tickCount.set(symbol, 0);
+        this.historicalData.set(symbol, historical);
+        this.dailyCandles.set(symbol, daily);
+        this.hourlyCandles = this.hourlyCandles || new Map();
+        this.fourHourCandles = this.fourHourCandles || new Map();
+        this.hourlyCandles.set(symbol, hourly);
+        this.fourHourCandles.set(symbol, fourHour);
+        this.candleAggregators.set(symbol, new CandleAggregator(symbol));
+        this.tickCount.set(symbol, 0);
+      } else {
+        // For equity stocks, load normal data
+        const [historical, daily] = await Promise.all([
+          this.db.getHistoricalData(symbol, CONFIG.EMA_PERIOD + 5),
+          this.db.getDailyCandles(symbol, 365), // Load 365 days for yearly volume calculation
+        ]);
+
+        this.historicalData.set(symbol, historical);
+        this.dailyCandles.set(symbol, daily);
+        this.candleAggregators.set(symbol, new CandleAggregator(symbol));
+        this.tickCount.set(symbol, 0);
+      }
     });
 
     await Promise.all(promises);
@@ -1241,15 +1557,29 @@ class EnhancedBreakoutScanner {
 
     // Run intraday index analysis (NIFTY/BANKNIFTY only)
     let indexSignal = null;
+    let swingIndexSignal = null;
     if (symbol === 'NIFTY' || symbol === 'BANKNIFTY') {
       indexSignal = this.analyzer.analyzeIntradayIndex(
         symbol,
         historical,
         currentCandle
       );
+
+      // Run swing positional index analysis (multi-timeframe)
+      const hourly = this.hourlyCandles?.get(symbol);
+      const fourHour = this.fourHourCandles?.get(symbol);
+      
+      if (hourly && fourHour && daily) {
+        swingIndexSignal = this.analyzer.analyzeSwingPositionalIndex(
+          symbol,
+          hourly,
+          fourHour,
+          daily
+        );
+      }
     }
 
-    if (!signal && !swingSignal && !swingBearishSignal && !indexSignal) return;
+    if (!signal && !swingSignal && !swingBearishSignal && !indexSignal && !swingIndexSignal) return;
 
     // Check if it's a bullish breakout signal
     if (
@@ -1360,6 +1690,27 @@ class EnhancedBreakoutScanner {
           this.lastIndexSignalTime.set(symbol, now);
           console.log(
             `📊 INDEX SIGNAL SAVED: ${symbol} - ${indexSignal.signal_type} @ ${indexSignal.entry_price} (${indexSignal.signal_direction})`
+          );
+        }
+      }
+    }
+
+    // Check if it's a swing index signal (NIFTY/BANKNIFTY positional)
+    if (swingIndexSignal) {
+      const lastSwingIndexSignal = this.lastSwingIndexSignalTime?.get(symbol);
+      const now = Date.now();
+
+      // Save swing index signals once per day (on daily candle close)
+      if (!lastSwingIndexSignal || now - lastSwingIndexSignal > 24 * 60 * 60 * 1000) {
+        const saved = await this.db.saveSwingPositionalIndexSignal(swingIndexSignal);
+
+        if (saved) {
+          if (!this.lastSwingIndexSignalTime) {
+            this.lastSwingIndexSignalTime = new Map();
+          }
+          this.lastSwingIndexSignalTime.set(symbol, now);
+          console.log(
+            `🎯 SWING INDEX SIGNAL SAVED: ${symbol} - ${swingIndexSignal.signal_type} @ ${swingIndexSignal.entry_price} (${swingIndexSignal.signal_direction}) | RSI14: ${swingIndexSignal.rsi14_daily.toFixed(2)}`
           );
         }
       }

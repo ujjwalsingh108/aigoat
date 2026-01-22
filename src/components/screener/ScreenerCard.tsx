@@ -28,6 +28,8 @@ export function ScreenerCard({
       router.push(`/screener/swing-positional-bearish`);
     } else if (label === "Intraday Index (NIFTY / BANKNIFTY)") {
       router.push(`/screener/intraday-index`);
+    } else if (label === "Swing Positional Index (NIFTY / BANKNIFTY)") {
+      router.push(`/screener/swing-index`);
     } else {
       // Other strategies - no route yet
       console.log(`Strategy not implemented: ${label}`);
