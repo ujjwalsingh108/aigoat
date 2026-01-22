@@ -28,6 +28,7 @@ export const CACHE_KEYS = {
   HISTORICAL_PRICES: 'historical:prices',
   BULLISH_SIGNALS: 'signals:bullish',
   BEARISH_SIGNALS: 'signals:bearish',
+  SWING_POSITIONAL_SIGNALS: 'signals:swing-positional',
   NSE_SYMBOLS: 'symbols:nse',
   KITE_TOKEN: 'kite:token',
   DAILY_CANDLES: 'historical:daily',
@@ -178,11 +179,17 @@ export function buildDailyCandleKey(symbol: string, days: number): string {
  * Helper: Build cache key for signals
  */
 export function buildSignalKey(
-  type: 'bullish' | 'bearish',
+  type: 'bullish' | 'bearish' | 'swing-positional',
   minutesAgo: number = 15
 ): string {
-  const prefix =
-    type === 'bullish' ? CACHE_KEYS.BULLISH_SIGNALS : CACHE_KEYS.BEARISH_SIGNALS;
+  let prefix: string;
+  if (type === 'bullish') {
+    prefix = CACHE_KEYS.BULLISH_SIGNALS;
+  } else if (type === 'bearish') {
+    prefix = CACHE_KEYS.BEARISH_SIGNALS;
+  } else {
+    prefix = CACHE_KEYS.SWING_POSITIONAL_SIGNALS;
+  }
   return `${prefix}:${minutesAgo}min`;
 }
 

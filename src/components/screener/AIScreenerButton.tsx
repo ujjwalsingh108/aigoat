@@ -7,7 +7,7 @@ import { BreakoutSignal, IntradayBearishSignal } from "@/types/breakout-signal";
 
 interface AIScreenerButtonProps {
   signals: BreakoutSignal[] | IntradayBearishSignal[];
-  screenerType: "bullish" | "bearish";
+  screenerType: "bullish" | "bearish" | "swing-positional";
   onOpenPanel: () => void;
   isLoading?: boolean;
 }

@@ -271,6 +271,43 @@ class DatabaseClient {
       return null;
     }
   }
+
+  async saveSwingPositionalSignal(signal) {
+    try {
+      const { data, error } = await this.supabase
+        .from("swing_positional_bullish")
+        .insert([
+          {
+            symbol: signal.symbol,
+            signal_type: signal.signal_type,
+            probability: signal.probability,
+            criteria_met: signal.criteria_met,
+            daily_ema20: signal.daily_ema20,
+            daily_sma50: signal.daily_sma50,
+            rsi_value: signal.rsi_value,
+            volume_ratio: signal.volume_ratio,
+            weekly_volatility: signal.weekly_volatility,
+            predicted_direction: signal.predicted_direction,
+            target_price: signal.target_price,
+            stop_loss: signal.stop_loss,
+            confidence: signal.confidence,
+            current_price: signal.current_price,
+            created_by: "zerodha_websocket_scanner",
+            is_public: true,
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(
+        `❌ Error saving swing positional signal for ${signal.symbol}:`,
+        error
+      );
+      return null;
+    }
+  }
 }
 
 // =================================================================
@@ -539,6 +576,42 @@ class TechnicalAnalyzer {
     return rsi;
   }
 
+  calculateSMA(prices, period = 50) {
+    if (prices.length < period) return null;
+    const recentPrices = prices.slice(-period);
+    return recentPrices.reduce((sum, price) => sum + price, 0) / period;
+  }
+
+  calculateWeeklyVolatility(dailyCandles) {
+    const last7Days = dailyCandles.slice(-7);
+    if (last7Days.length < 7) return 0;
+    
+    const high = Math.max(...last7Days.map(c => parseFloat(c.high)));
+    const low = Math.min(...last7Days.map(c => parseFloat(c.low)));
+    
+    return ((high - low) / low) * 100;
+  }
+
+  calculateYearlyVolumeRatio(dailyCandles) {
+    // Use last 365 days or available data
+    const yearlyCandles = dailyCandles.slice(-365);
+    if (yearlyCandles.length === 0) return 0;
+    
+    const avgVolume = yearlyCandles.reduce((sum, c) => 
+      sum + parseInt(c.volume || 0), 0) / yearlyCandles.length;
+    
+    const currentVolume = parseInt(
+      dailyCandles[dailyCandles.length - 1]?.volume || 0
+    );
+    
+    return avgVolume > 0 ? currentVolume / avgVolume : 0;
+  }
+
+  checkYearlyVolume(dailyCandles) {
+    const ratio = this.calculateYearlyVolumeRatio(dailyCandles);
+    return ratio >= 2; // 2x yearly average
+  }
+
   analyzeStock(symbol, historicalCandles, currentCandle, dailyCandles) {
     if (
       !currentCandle ||
@@ -674,6 +747,75 @@ class TechnicalAnalyzer {
     };
   }
 
+  analyzeSwingPositional(symbol, dailyCandles, currentPrice) {
+    // Need at least 365 days for yearly volume, but work with what we have
+    if (!dailyCandles || dailyCandles.length < 50) {
+      return null; // Minimum 50 days for SMA50
+    }
+
+    // 1. Universe: Already filtered (2500 stocks loaded)
+    const universeFilter = true;
+
+    // 2. Trend: Price > 20 EMA & 50 SMA (Daily)
+    const dailyPrices = dailyCandles.map(c => parseFloat(c.close));
+    const dailyEMA20 = this.calculateEMA(dailyPrices, 20);
+    const dailySMA50 = this.calculateSMA(dailyPrices, 50);
+    const trendFilter = 
+      dailyEMA20 && dailySMA50 && 
+      currentPrice > dailyEMA20 && 
+      currentPrice > dailySMA50;
+
+    // 3. Momentum: RSI 50-80 (Daily)
+    const dailyRSI = this.calculateRSI(dailyPrices, 14);
+    const momentumFilter = dailyRSI && dailyRSI > 50 && dailyRSI < 80;
+
+    // 4. Volume: 2x yearly average (calculate from available data)
+    const volumeFilter = this.checkYearlyVolume(dailyCandles);
+
+    // 5. Volatility: 1-5% weekly movement
+    const weeklyVolatility = this.calculateWeeklyVolatility(dailyCandles);
+    const volatilityFilter = weeklyVolatility >= 1 && weeklyVolatility <= 5;
+
+    // 6. Market Cap: Top 2500 (already satisfied by universe filter)
+    const marketCapFilter = true;
+
+    const criteriaResults = [
+      universeFilter,
+      trendFilter,
+      momentumFilter,
+      volumeFilter,
+      volatilityFilter,
+      marketCapFilter,
+    ];
+
+    const criteriaMet = criteriaResults.filter(Boolean).length;
+    const probability = criteriaMet / 6;
+
+    // Only return signals with 5-6 criteria met (high confidence for swing)
+    if (criteriaMet < 5) {
+      return null;
+    }
+
+    const volumeRatio = this.calculateYearlyVolumeRatio(dailyCandles);
+
+    return {
+      symbol,
+      signal_type: "SWING_POSITIONAL_BULLISH",
+      probability: parseFloat(probability.toFixed(2)),
+      criteria_met: criteriaMet,
+      daily_ema20: dailyEMA20 ? parseFloat(dailyEMA20.toFixed(2)) : null,
+      daily_sma50: dailySMA50 ? parseFloat(dailySMA50.toFixed(2)) : null,
+      rsi_value: dailyRSI ? parseFloat(dailyRSI.toFixed(2)) : null,
+      volume_ratio: parseFloat(volumeRatio.toFixed(2)),
+      weekly_volatility: parseFloat(weeklyVolatility.toFixed(2)),
+      predicted_direction: "UP",
+      target_price: parseFloat((currentPrice * 1.05).toFixed(2)), // 5% target for swing
+      stop_loss: parseFloat((currentPrice * 0.97).toFixed(2)), // 3% stop loss
+      confidence: parseFloat(probability.toFixed(2)),
+      current_price: parseFloat(currentPrice.toFixed(2)),
+    };
+  }
+
   checkVolumeCondition(candles) {
     try {
       const dailyVolumes = {};
@@ -780,7 +922,7 @@ class EnhancedBreakoutScanner {
 
       const [historical, daily] = await Promise.all([
         this.db.getHistoricalData(symbol, CONFIG.EMA_PERIOD + 5),
-        this.db.getDailyCandles(symbol, 30),
+        this.db.getDailyCandles(symbol, 365), // Load 365 days for yearly volume calculation
       ]);
 
       this.historicalData.set(symbol, historical);
@@ -850,6 +992,9 @@ class EnhancedBreakoutScanner {
     const currentCandle = aggregator.getCurrentCandle();
     if (!currentCandle) return;
 
+    const currentPrice = parseFloat(currentCandle.close);
+
+    // Run intraday analysis (existing logic)
     const signal = this.analyzer.analyzeStock(
       symbol,
       historical,
@@ -857,10 +1002,18 @@ class EnhancedBreakoutScanner {
       daily
     );
 
-    if (!signal) return;
+    // Run swing positional analysis (new logic)
+    const swingSignal = this.analyzer.analyzeSwingPositional(
+      symbol,
+      daily,
+      currentPrice
+    );
+
+    if (!signal && !swingSignal) return;
 
     // Check if it's a bullish breakout signal
     if (
+      signal &&
       signal.signal_type === "BULLISH_BREAKOUT" &&
       signal.probability >= CONFIG.MIN_CONFIDENCE_TO_SAVE &&
       signal.criteria_met >= CONFIG.MIN_CRITERIA_MET
@@ -883,6 +1036,7 @@ class EnhancedBreakoutScanner {
     }
     // Check if it's a bearish breakdown signal
     else if (
+      signal &&
       signal.signal_type === "BEARISH_BREAKDOWN" &&
       signal.probability <= CONFIG.MIN_BEARISH_CONFIDENCE &&
       signal.criteria_met <= CONFIG.MAX_BEARISH_CRITERIA
@@ -899,6 +1053,29 @@ class EnhancedBreakoutScanner {
             `📉 BEARISH SIGNAL SAVED: ${symbol} - ${signal.signal_type} (${(
               signal.probability * 100
             ).toFixed(0)}% confidence) @ ₹${signal.current_price}`
+          );
+        }
+      }
+    }
+
+    // Check if it's a swing positional signal (new logic)
+    if (swingSignal && swingSignal.criteria_met >= 5) {
+      const lastSwingSignal = this.lastSwingSignalTime?.get(symbol);
+      const now = Date.now();
+
+      // Save swing signals less frequently (once per hour)
+      if (!lastSwingSignal || now - lastSwingSignal > 60 * 60 * 1000) {
+        const saved = await this.db.saveSwingPositionalSignal(swingSignal);
+
+        if (saved) {
+          if (!this.lastSwingSignalTime) {
+            this.lastSwingSignalTime = new Map();
+          }
+          this.lastSwingSignalTime.set(symbol, now);
+          console.log(
+            `📅 SWING POSITIONAL SAVED: ${symbol} - ${swingSignal.signal_type} (${(
+              swingSignal.probability * 100
+            ).toFixed(0)}% confidence) @ ₹${swingSignal.current_price}`
           );
         }
       }
