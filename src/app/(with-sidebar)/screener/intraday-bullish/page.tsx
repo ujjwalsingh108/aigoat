@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -17,12 +17,21 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { BreakoutSignalCard } from "@/components/screener/BreakoutDashboard";
+import { AIScreenerButton } from "@/components/screener/AIScreenerButton";
+
+// Lazy load AI panel (code-split for performance)
+const AIScreenerPanel = lazy(() =>
+  import("@/components/screener/AIScreenerPanel").then((mod) => ({
+    default: mod.AIScreenerPanel,
+  }))
+);
 
 export default function IntradayBullishPage() {
   const router = useRouter();
   const [signals, setSignals] = useState<BreakoutSignal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -92,6 +101,15 @@ export default function IntradayBullishPage() {
           <span className="text-xs text-muted-foreground">
             Updated: {lastUpdate.toLocaleTimeString()}
           </span>
+
+          {/* AI Button (Auth-gated, only renders if authenticated) */}
+          <AIScreenerButton
+            signals={signals}
+            screenerType="bullish"
+            onOpenPanel={() => setIsAIPanelOpen(true)}
+            isLoading={isLoading}
+          />
+
           <Button
             variant="outline"
             size="sm"
@@ -191,6 +209,17 @@ export default function IntradayBullishPage() {
             <BreakoutSignalCard key={signal.id} signal={signal} />
           ))}
         </div>
+      )}
+
+      {/* AI Panel (Lazy loaded, only mounts when opened) */}
+      {isAIPanelOpen && (
+        <Suspense fallback={null}>
+          <AIScreenerPanel
+            signals={signals}
+            screenerType="bullish"
+            onClose={() => setIsAIPanelOpen(false)}
+          />
+        </Suspense>
       )}
     </div>
   );
