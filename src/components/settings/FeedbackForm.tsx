@@ -81,10 +81,17 @@ export function FeedbackForm() {
 
   const handleDeleteDbImage = async (url: string) => {
     try {
-      const fileName = decodeURIComponent(url.split("/").pop()!);
+      // Extract the full path from the URL
+      // URL format: https://{project}.supabase.co/storage/v1/object/public/feedback/{email}/{feedbackId}/{filename}
+      const urlParts = url.split("/storage/v1/object/public/feedback/");
+      if (urlParts.length < 2) {
+        console.error("Invalid URL format");
+        return;
+      }
+      const filePath = urlParts[1];
 
       // remove from bucket
-      await supabase.storage.from("feedback-attachments").remove([fileName]);
+      await supabase.storage.from("feedback").remove([filePath]);
 
       const currentFeedback = feedbackHistory[0];
       const updated = currentFeedback.attachments.filter((att) => att !== url);
@@ -125,14 +132,20 @@ export function FeedbackForm() {
       .eq("user_id", user.id)
       .maybeSingle();
 
+    // Generate a unique feedback ID for this submission
+    const feedbackId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Encode email for safe folder naming (replace special characters)
+    const safeEmail = user.email!.replace(/[^a-zA-Z0-9@._-]/g, "_");
+
     const attachmentUrls: string[] = [];
 
-    // Upload files
+    // Upload files with new structure: feedback/{email}/{feedbackId}/{filename}
     for (const file of files) {
-      const filePath = `${user.id}/${Date.now()}-${file.name}`;
+      const filePath = `${safeEmail}/${feedbackId}/${file.name}`;
 
       const { error } = await supabase.storage
-        .from("feedback-attachments")
+        .from("feedback")
         .upload(filePath, file, {
           cacheControl: "3600",
           upsert: false,
@@ -144,7 +157,7 @@ export function FeedbackForm() {
       }
 
       const { data: publicUrl } = supabase.storage
-        .from("feedback-attachments")
+        .from("feedback")
         .getPublicUrl(filePath);
 
       attachmentUrls.push(publicUrl.publicUrl);
