@@ -16,6 +16,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 import Image from "next/image";
+import { FeedbackHistoryModal } from "./FeedbackHistoryModal";
 
 type Feedback = {
   id: string;
@@ -33,6 +34,7 @@ export function FeedbackForm() {
   const [detail, setDetail] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   const [feedbackHistory, setFeedbackHistory] = useState<Feedback[]>([]);
 
@@ -333,7 +335,11 @@ export function FeedbackForm() {
 
           {/* Actions */}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setHistoryModalOpen(true)}
+            >
               Feedback History ({feedbackHistory.length})
             </Button>
             <Button
@@ -346,6 +352,14 @@ export function FeedbackForm() {
           </div>
         </form>
       </CardContent>
+
+      {/* Feedback History Modal */}
+      <FeedbackHistoryModal
+        open={historyModalOpen}
+        onOpenChange={setHistoryModalOpen}
+        feedbackHistory={feedbackHistory}
+        loading={false}
+      />
     </Card>
   );
 }
