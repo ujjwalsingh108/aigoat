@@ -8,7 +8,8 @@ const { PatternDetector } = require("./pattern-detector");
 // 🔧 CONFIGURATION
 // =================================================================
 
-// Scanner will fetch all 2515 NSE equity stocks from kite_nse_equity_symbols table
+// Scanner will fetch top 1000 NSE equity stocks from kite_nse_equity_symbols table
+// Limited to 1000 symbols for optimal performance
 // No hardcoded symbols - dynamically loaded from database
 
 const CONFIG = {
@@ -60,7 +61,7 @@ class DatabaseClient {
   async getNseTop1000Symbols() {
     try {
       // Try to get from cache first (TTL: 24 hours)
-      const cacheKey = "nse_equity_symbols";
+      const cacheKey = "nse_equity_symbols_top_1000";
       const cached = cache.get(cacheKey);
       
       if (cached) {
@@ -69,14 +70,16 @@ class DatabaseClient {
         return cached;
       }
 
-      // Query all NSE equity stocks from kite_nse_equity_symbols table (2515 stocks)
+      // Query top 1000 NSE equity stocks from kite_nse_equity_symbols table
       // Filter: is_active = true
       // Order by symbol alphabetically for consistent loading
+      // Limit to 1000 stocks for optimized scanning performance
       const { data, error } = await this.supabase
         .from("kite_nse_equity_symbols")
         .select("symbol, instrument_token, exchange, type, segment")
         .eq("is_active", true)
-        .order("symbol", { ascending: true });
+        .order("symbol", { ascending: true })
+        .limit(1000);
 
       if (error) throw error;
 
