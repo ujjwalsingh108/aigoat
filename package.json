@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "kite-auth": "tsx scripts/kite-token-manager.ts",
+    "fetch-nse-symbols": "tsx scripts/fetch-nse-equity-symbols.ts",
     "fetch-bse-symbols": "tsx scripts/fetch-bse-equity-symbols.ts"
   },
   "dependencies": {
