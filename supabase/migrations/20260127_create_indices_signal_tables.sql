@@ -108,13 +108,12 @@ create policy "Service role has full access"
   with check (true);
 
 -- =====================================================================
--- 3. BSE EQUITY SIGNALS (BSE Stocks)
+-- 3. BSE BULLISH BREAKOUT SIGNALS (BSE Stocks)
 -- =====================================================================
-create table public.bse_equity_signals (
+create table public.bullish_breakout_bse_eq (
   id bigserial not null,
   symbol text not null,
   instrument_token text not null,
-  signal_type text not null, -- BULLISH_BREAKOUT, BEARISH_BREAKDOWN
   entry_price numeric not null,
   ema20_5min numeric not null,
   rsi14_5min numeric null,
@@ -128,31 +127,74 @@ create table public.bse_equity_signals (
   criteria_met integer null,
   is_active boolean not null default true,
   created_at timestamp with time zone not null default now(),
-  constraint bse_equity_signals_pkey primary key (id)
+  constraint bullish_breakout_bse_eq_pkey primary key (id)
 ) tablespace pg_default;
 
-create index if not exists idx_bse_equity_signals_symbol on public.bse_equity_signals using btree (symbol) tablespace pg_default;
-create index if not exists idx_bse_equity_signals_created_at on public.bse_equity_signals using btree (created_at desc) tablespace pg_default;
-create index if not exists idx_bse_equity_signals_is_active on public.bse_equity_signals using btree (is_active) tablespace pg_default;
-create index if not exists idx_bse_equity_signals_signal_type on public.bse_equity_signals using btree (signal_type) tablespace pg_default;
+create index if not exists idx_bullish_breakout_bse_eq_symbol on public.bullish_breakout_bse_eq using btree (symbol) tablespace pg_default;
+create index if not exists idx_bullish_breakout_bse_eq_created_at on public.bullish_breakout_bse_eq using btree (created_at desc) tablespace pg_default;
+create index if not exists idx_bullish_breakout_bse_eq_is_active on public.bullish_breakout_bse_eq using btree (is_active) tablespace pg_default;
+create index if not exists idx_bullish_breakout_bse_eq_probability on public.bullish_breakout_bse_eq using btree (probability) tablespace pg_default;
 
 -- RLS Policies
-alter table public.bse_equity_signals enable row level security;
+alter table public.bullish_breakout_bse_eq enable row level security;
 
 create policy "Enable read access for all users"
-  on public.bse_equity_signals
+  on public.bullish_breakout_bse_eq
   for select
   using (true);
 
 create policy "Service role has full access"
-  on public.bse_equity_signals
+  on public.bullish_breakout_bse_eq
   for all
   to service_role
   using (true)
   with check (true);
 
 -- =====================================================================
--- 4. BSE F&O SIGNALS (BSE F&O - SENSEX, etc.)
+-- 4. BSE BEARISH BREAKDOWN SIGNALS (BSE Stocks)
+-- =====================================================================
+create table public.bearish_breakout_bse_eq (
+  id bigserial not null,
+  symbol text not null,
+  instrument_token text not null,
+  entry_price numeric not null,
+  ema20_5min numeric not null,
+  rsi14_5min numeric null,
+  volume bigint null,
+  avg_volume bigint null,
+  candle_time timestamp with time zone not null,
+  target1 numeric null,
+  target2 numeric null,
+  stop_loss numeric null,
+  probability numeric null,
+  criteria_met integer null,
+  is_active boolean not null default true,
+  created_at timestamp with time zone not null default now(),
+  constraint bearish_breakout_bse_eq_pkey primary key (id)
+) tablespace pg_default;
+
+create index if not exists idx_bearish_breakout_bse_eq_symbol on public.bearish_breakout_bse_eq using btree (symbol) tablespace pg_default;
+create index if not exists idx_bearish_breakout_bse_eq_created_at on public.bearish_breakout_bse_eq using btree (created_at desc) tablespace pg_default;
+create index if not exists idx_bearish_breakout_bse_eq_is_active on public.bearish_breakout_bse_eq using btree (is_active) tablespace pg_default;
+create index if not exists idx_bearish_breakout_bse_eq_probability on public.bearish_breakout_bse_eq using btree (probability) tablespace pg_default;
+
+-- RLS Policies
+alter table public.bearish_breakout_bse_eq enable row level security;
+
+create policy "Enable read access for all users"
+  on public.bearish_breakout_bse_eq
+  for select
+  using (true);
+
+create policy "Service role has full access"
+  on public.bearish_breakout_bse_eq
+  for all
+  to service_role
+  using (true)
+  with check (true);
+
+-- =====================================================================
+-- 5. BSE F&O SIGNALS (BSE F&O - SENSEX, etc.)
 -- =====================================================================
 create table public.bse_fo_signals (
   id bigserial not null,
@@ -205,16 +247,16 @@ create policy "Service role has full access"
 -- =====================================================================
 -- SUMMARY
 -- =====================================================================
--- Created 4 signal tables for new market segments:
+-- Created 5 signal tables for new market segments:
 -- 1. nse_fo_signals - NSE F&O (NIFTY, BANKNIFTY futures/options)
 -- 2. banknifty_fo_signals - BANKNIFTY F&O only
--- 3. bse_equity_signals - BSE equity stocks
--- 4. bse_fo_signals - BSE F&O (SENSEX, etc.)
+-- 3. bullish_breakout_bse_eq - BSE bullish breakout signals
+-- 4. bearish_breakout_bse_eq - BSE bearish breakdown signals
+-- 5. bse_fo_signals - BSE F&O (SENSEX, etc.)
 --
 -- NOTE: NSE Equity signals are already handled by existing tables:
 -- - bullish_breakout_nse_eq (for bullish signals)
 -- - bearish_breakout_nse_eq (for bearish signals)
--- - BANKNIFTY equity stocks are filtered from these existing tables
 --
 -- Each table has:
 -- - Full signal metadata (entry, targets, stop-loss, probability)

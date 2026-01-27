@@ -1,52 +1,93 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import { BreakoutSignal } from "@/types/breakout-signal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Activity,
+  Target,
+  AlertTriangle,
+  RefreshCw,
+  TrendingUp,
+  ArrowUpRight,
+  BarChart3,
+  ArrowLeft,
+} from "lucide-react";
+import { BreakoutSignalCard } from "@/components/screener/BreakoutDashboard";
+import { AIScreenerButton } from "@/components/screener/AIScreenerButton";
+
+// Lazy load AI panel (code-split for performance)
+const AIScreenerPanel = lazy(() =>
+  import("@/components/screener/AIScreenerPanel").then((mod) => ({
+    default: mod.AIScreenerPanel,
+  }))
+);
 
 export default function BSEBullishPage() {
   const router = useRouter();
-  const [signals, setSignals] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [signals, setSignals] = useState<BreakoutSignal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
-  const loadSignals = async () => {
-    setLoading(true);
+  const supabase = createClient();
+
+  // Load BSE bullish signals
+  const loadBullishSignals = useCallback(async () => {
     try {
-      // TODO: Create API endpoint for BSE bullish signals
-      // For now, show placeholder
-      const response = await fetch("/api/signals/bse-bullish?limit=50");
-      if (response.ok) {
-        const data = await response.json();
-        setSignals(data.signals || []);
+      setIsLoading(true);
+
+      const { data, error } = await supabase
+        .from("bullish_breakout_bse_eq")
+        .select("*")
+        .eq("is_active", true)
+        .gte(
+          "created_at",
+          new Date(Date.now() - 15 * 60 * 1000).toISOString()
+        )
+        .gte("probability", 0.6)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error("Error loading BSE bullish signals:", error);
       } else {
-        setSignals([]);
+        setSignals(data || []);
+        setLastUpdate(new Date());
       }
-    } catch (error) {
-      console.error("Error loading BSE bullish signals:", error);
-      setSignals([]);
+    } catch (err) {
+      console.error("Exception loading BSE bullish signals:", err);
     } finally {
-      setLoading(false);
-      setLastUpdate(new Date());
+      setIsLoading(false);
     }
+  }, [supabase]);
+
+  // Initial load
+  useEffect(() => {
+    loadBullishSignals();
+  }, [loadBullishSignals]);
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadBullishSignals();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [loadBullishSignals]);
+
+  const handleRefresh = () => {
+    loadBullishSignals();
   };
 
-  useEffect(() => {
-    loadSignals();
-    
-    // Auto-refresh every 60 seconds
-    const interval = setInterval(loadSignals, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <div className="container mx-auto p-4 space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-3 md:mt-6">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -55,118 +96,138 @@ export default function BSEBullishPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-green-600" />
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+              <TrendingUp className="h-7 w-7 text-green-500" />
               BSE Bullish Breakout
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Real-time bullish breakout signals from BSE equity stocks
+            <p className="text-sm text-muted-foreground mt-1">
+              Bullish breakout signals from BSE equity stocks
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadSignals}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">
+            Updated: {lastUpdate.toLocaleTimeString()}
+          </span>
+
+          {/* AI Button (Auth-gated, only renders if authenticated) */}
+          <AIScreenerButton
+            signals={signals}
+            screenerType="bse-bullish"
+            onOpenPanel={() => setIsAIPanelOpen(true)}
+            isLoading={isLoading}
+          />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Card */}
-      <Card>
+      {/* Strategy Info Card */}
+      <Card className="border-green-200 dark:border-green-900/30 bg-green-50/50 dark:bg-green-950/20">
         <CardHeader>
-          <CardTitle className="text-lg">Signal Statistics</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Activity className="h-5 w-5 text-green-600" />
+            Strategy Criteria (6 Total)
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Signals</p>
-              <p className="text-2xl font-bold text-green-600">{signals.length}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+            <div className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
+                1
+              </div>
+              <span>BSE Equity Stocks (12,704 stocks)</span>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Last Updated</p>
-              <p className="text-sm font-medium">{lastUpdate.toLocaleTimeString()}</p>
+            <div className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
+                2
+              </div>
+              <span>Trading above 20 EMA (Daily)</span>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <Badge variant="default">Scanner Coming Soon</Badge>
+            <div className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
+                3
+              </div>
+              <span>Trading above 20 EMA (5-min)</span>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Market</p>
-              <p className="text-sm font-medium">BSE Equity</p>
+            <div className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
+                4
+              </div>
+              <span>Volume &gt; 1.5x average volume</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
+                5
+              </div>
+              <span>Price breakout from consolidation</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
+                6
+              </div>
+              <span>RSI: 50 &lt; RSI &lt; 70</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Signals List */}
-      {loading ? (
-        <Card>
-          <CardContent className="py-8">
-            <div className="text-center text-muted-foreground">
-              <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin" />
-              Loading signals...
-            </div>
+      {/* Signals Count */}
+      <div className="flex items-center gap-4">
+        <Badge variant="outline" className="text-base px-4 py-2">
+          <BarChart3 className="h-4 w-4 mr-2" />
+          {signals.length} Active Signals
+        </Badge>
+      </div>
+
+      {/* Loading State */}
+      {isLoading && signals.length === 0 && (
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* No Signals */}
+      {!isLoading && signals.length === 0 && (
+        <Card className="py-12">
+          <CardContent className="text-center">
+            <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-lg font-semibold">No Bullish Signals Found</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              No BSE stocks meet all criteria at the moment. Check back later.
+            </p>
           </CardContent>
         </Card>
-      ) : signals.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Scanner Under Development</h3>
-              <p className="text-muted-foreground mb-4">
-                BSE bullish breakout scanner is currently being developed.
-                <br />
-                Database: <strong>12,704 BSE stocks</strong> are ready for scanning.
-              </p>
-              <Badge variant="outline" className="text-sm">
-                Coming Soon
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {signals.map((signal: any, idx: number) => (
-            <Card key={idx} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{signal.symbol}</CardTitle>
-                  <Badge variant="default">
-                    {(signal.probability * 100).toFixed(0)}%
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Entry</span>
-                  <span className="font-semibold">₹{signal.entry_price}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Target 1</span>
-                  <span className="text-green-600 font-semibold">₹{signal.target1}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Stop Loss</span>
-                  <span className="text-red-600 font-semibold">₹{signal.stop_loss}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Volume</span>
-                  <span>{signal.volume?.toLocaleString()}</span>
-                </div>
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(signal.candle_time).toLocaleString()}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+      )}
+
+      {/* Signals Grid */}
+      {signals.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {signals.map((signal) => (
+            <BreakoutSignalCard key={signal.id} signal={signal} />
           ))}
         </div>
+      )}
+
+      {/* AI Panel (Lazy loaded, only mounts when opened) */}
+      {isAIPanelOpen && (
+        <Suspense fallback={null}>
+          <AIScreenerPanel
+            signals={signals}
+            screenerType="bse-bullish"
+            onClose={() => setIsAIPanelOpen(false)}
+          />
+        </Suspense>
       )}
     </div>
   );
