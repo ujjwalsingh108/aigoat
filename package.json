@@ -9,7 +9,9 @@
     "lint": "next lint",
     "kite-auth": "tsx scripts/kite-token-manager.ts",
     "fetch-nse-symbols": "tsx scripts/fetch-nse-equity-symbols.ts",
-    "fetch-bse-symbols": "tsx scripts/fetch-bse-equity-symbols.ts"
+    "fetch-bse-symbols": "tsx scripts/fetch-bse-equity-symbols.ts",
+    "fetch-nse-fo": "tsx scripts/fetch-nse-fo-symbols.ts",
+    "cleanup-expired-fo": "tsx scripts/cleanup-expired-fo-symbols.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
