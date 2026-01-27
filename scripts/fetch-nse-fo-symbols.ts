@@ -51,7 +51,7 @@ interface NSEFOSymbol {
 /**
  * Fetch instruments from Kite Connect API
  */
-async function fetchKiteInstruments(): Promise<KiteInstrument[]> {
+async function fetchKiteInstruments(): Promise<any[]> {
   if (!API_KEY || !ACCESS_TOKEN) {
     throw new Error("KITE_API_KEY and KITE_ACCESS_TOKEN must be set in .env file");
   }
@@ -91,7 +91,7 @@ function extractUnderlying(tradingSymbol: string, instrumentType: string): strin
 /**
  * Filter NSE F&O symbols from all instruments
  */
-function filterNSEFOSymbols(instruments: KiteInstrument[]): NSEFOSymbol[] {
+function filterNSEFOSymbols(instruments: any[]): NSEFOSymbol[] {
   console.log("Filtering NSE F&O symbols...");
 
   const nseForD = instruments

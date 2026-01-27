@@ -48,7 +48,7 @@ interface NSEEquitySymbol {
 /**
  * Fetch instruments from Kite Connect API
  */
-async function fetchKiteInstruments(): Promise<KiteInstrument[]> {
+async function fetchKiteInstruments(): Promise<any[]> {
   if (!API_KEY || !ACCESS_TOKEN) {
     throw new Error("KITE_API_KEY and KITE_ACCESS_TOKEN must be set in .env file");
   }
@@ -74,7 +74,7 @@ async function fetchKiteInstruments(): Promise<KiteInstrument[]> {
 /**
  * Filter NSE equity symbols from all instruments
  */
-function filterNSEEquitySymbols(instruments: KiteInstrument[]): NSEEquitySymbol[] {
+function filterNSEEquitySymbols(instruments: any[]): NSEEquitySymbol[] {
   console.log("Filtering NSE equity symbols...");
 
   const nseEquities = instruments

@@ -48,7 +48,7 @@ interface BSEEquitySymbol {
 /**
  * Fetch instruments from Kite Connect API
  */
-async function fetchKiteInstruments(): Promise<KiteInstrument[]> {
+async function fetchKiteInstruments(): Promise<any[]> {
   if (!API_KEY || !ACCESS_TOKEN) {
     throw new Error("KITE_API_KEY and KITE_ACCESS_TOKEN must be set in .env file");
   }
@@ -74,7 +74,7 @@ async function fetchKiteInstruments(): Promise<KiteInstrument[]> {
 /**
  * Filter BSE equity symbols from all instruments
  */
-function filterBSEEquitySymbols(instruments: KiteInstrument[]): BSEEquitySymbol[] {
+function filterBSEEquitySymbols(instruments: any[]): BSEEquitySymbol[] {
   console.log("Filtering BSE equity symbols...");
 
   const bseEquities = instruments
