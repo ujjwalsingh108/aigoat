@@ -11,6 +11,7 @@
     "fetch-nse-symbols": "tsx scripts/fetch-nse-equity-symbols.ts",
     "fetch-bse-symbols": "tsx scripts/fetch-bse-equity-symbols.ts",
     "fetch-nse-fo": "tsx scripts/fetch-nse-fo-symbols.ts",
+    "fetch-bse-fo": "tsx scripts/fetch-bse-fo-symbols.ts",
     "cleanup-expired-fo": "tsx scripts/cleanup-expired-fo-symbols.ts"
   },
   "dependencies": {
