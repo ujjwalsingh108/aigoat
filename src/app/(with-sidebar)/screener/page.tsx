@@ -22,6 +22,13 @@ export default function Screener() {
   const [uploading, setUploading] = React.useState(false);
   const [bullishCount, setBullishCount] = useState(0);
   const [bearishCount, setBearishCount] = useState(0);
+  
+  // Indices symbol counts
+  const [niftyFoCount, setNiftyFoCount] = useState(0);
+  const [bankniftyFoCount, setBankniftyFoCount] = useState(0);
+  const [bseFoCount, setBseFoCount] = useState(0);
+  const [bseBullishCount, setBseBullishCount] = useState(0);
+  const [bseBearishCount, setBseBearishCount] = useState(0);
 
   const supabase = createClient();
 
@@ -64,22 +71,59 @@ export default function Screener() {
     return () => clearInterval(interval);
   }, [supabase]);
 
+  // Fetch indices symbol counts
+  useEffect(() => {
+    const fetchIndicesCounts = async () => {
+      try {
+        // Fetch NIFTY F&O count
+        const niftyFoResponse = await fetch("/api/symbols/nse-fo?underlying=NIFTY&limit=1000");
+        const niftyFoData = await niftyFoResponse.json();
+        setNiftyFoCount(niftyFoData.count || 0);
+
+        // Fetch BANKNIFTY F&O count
+        const bankniftyFoResponse = await fetch("/api/symbols/nse-fo?underlying=BANKNIFTY&limit=1000");
+        const bankniftyFoData = await bankniftyFoResponse.json();
+        setBankniftyFoCount(bankniftyFoData.count || 0);
+
+        // Fetch BSE Equity count for BSE bullish/bearish cards
+        const bseEquityResponse = await fetch("/api/symbols/bse-equity?limit=1000");
+        const bseEquityData = await bseEquityResponse.json();
+        setBseBullishCount(bseEquityData.count || 0);
+        setBseBearishCount(bseEquityData.count || 0);
+
+        // Fetch BSE F&O count
+        const bseFoResponse = await fetch("/api/symbols/bse-fo?limit=1000");
+        const bseFoData = await bseFoResponse.json();
+        setBseFoCount(bseFoData.count || 0);
+      } catch (error) {
+        console.error("Error fetching indices counts:", error);
+      }
+    };
+
+    fetchIndicesCounts();
+  }, []);
+
   const screenerData = [
     {
-      title: "Stocks",
+      title: "NSE Stocks (EQ)",
       items: [
         {
-          label: "Intraday Equity Bullish",
+          label: "NSE Bullish Breakout",
           tags: ["Bullish"],
           symbols: bullishCount,
           image: "/images/stocks-bullish-tomorrow.jpg",
         },
         {
-          label: "Intraday Equity Bearish",
+          label: "NSE Bearish Breakdown",
           tags: ["Bearish"],
           symbols: bearishCount,
           image: "/images/stocks-bearish-daytrading.jpg",
         },
+      ],
+    },
+    {
+      title: "Swing Positional (NSE)",
+      items: [
         {
           label: "Swing Positional Equity Bullish (1-15 days)",
           tags: ["Bullish"],
@@ -95,42 +139,41 @@ export default function Screener() {
       ],
     },
     {
+      title: "BSE Stocks (EQ)",
+      items: [
+        {
+          label: "BSE Bullish Breakout",
+          tags: ["Bullish"],
+          symbols: bseBullishCount,
+          image: "/images/stocks-bullish-tomorrow.jpg",
+        },
+        {
+          label: "BSE Bearish Breakdown",
+          tags: ["Bearish"],
+          symbols: bseBearishCount,
+          image: "/images/stocks-bearish-daytrading.jpg",
+        },
+      ],
+    },
+    {
       title: "Indices",
       items: [
         {
-          label: "NIFTY Equity",
-          tags: ["Buy/Sell"],
-          symbols: 0,
-          image: "/images/stocks-bullish-tomorrow.jpg",
-        },
-        {
           label: "NIFTY F&O",
           tags: ["Buy/Sell"],
-          symbols: 0,
-          image: "/images/stocks-bullish-tomorrow.jpg",
-        },
-        {
-          label: "BANKNIFTY Equity",
-          tags: ["Buy/Sell"],
-          symbols: 0,
+          symbols: niftyFoCount,
           image: "/images/stocks-bullish-tomorrow.jpg",
         },
         {
           label: "BANKNIFTY F&O",
           tags: ["Buy/Sell"],
-          symbols: 0,
+          symbols: bankniftyFoCount,
           image: "/images/stocks-bullish-tomorrow.jpg",
-        },
-        {
-          label: "BSE Equity",
-          tags: ["Buy/Sell"],
-          symbols: 0,
-          image: "/images/stocks-bullish-month.jpg",
         },
         {
           label: "BSE F&O",
           tags: ["Buy/Sell"],
-          symbols: 0,
+          symbols: bseFoCount,
           image: "/images/stocks-bullish-month.jpg",
         },
       ],
