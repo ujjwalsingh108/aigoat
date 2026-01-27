@@ -26,6 +26,18 @@ export function ScreenerCard({
       router.push(`/screener/swing-positional-bullish`);
     } else if (label === "Swing Positional Equity Bearish (1-15 days)") {
       router.push(`/screener/swing-positional-bearish`);
+    } else if (label === "NIFTY Equity") {
+      router.push(`/screener/nifty-equity`);
+    } else if (label === "NIFTY F&O") {
+      router.push(`/screener/nifty-fo`);
+    } else if (label === "BANKNIFTY Equity") {
+      router.push(`/screener/banknifty-equity`);
+    } else if (label === "BANKNIFTY F&O") {
+      router.push(`/screener/banknifty-fo`);
+    } else if (label === "BSE Equity") {
+      router.push(`/screener/bse-equity`);
+    } else if (label === "BSE F&O") {
+      router.push(`/screener/bse-fo`);
     } else if (label === "Intraday Index (NIFTY / BANKNIFTY)") {
       router.push(`/screener/intraday-index`);
     } else if (label === "Swing Positional Index (NIFTY / BANKNIFTY)") {
