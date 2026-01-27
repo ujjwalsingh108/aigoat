@@ -98,14 +98,38 @@ export default function Screener() {
       title: "Indices",
       items: [
         {
-          label: "Intraday Index (NIFTY / BANKNIFTY)",
+          label: "NIFTY Equity",
           tags: ["Buy/Sell"],
           symbols: 0,
           image: "/images/stocks-bullish-tomorrow.jpg",
         },
         {
-          label: "Swing Positional Index (NIFTY / BANKNIFTY)",
-          tags: ["Long/Short"],
+          label: "NIFTY F&O",
+          tags: ["Buy/Sell"],
+          symbols: 0,
+          image: "/images/stocks-bullish-tomorrow.jpg",
+        },
+        {
+          label: "BANKNIFTY Equity",
+          tags: ["Buy/Sell"],
+          symbols: 0,
+          image: "/images/stocks-bullish-tomorrow.jpg",
+        },
+        {
+          label: "BANKNIFTY F&O",
+          tags: ["Buy/Sell"],
+          symbols: 0,
+          image: "/images/stocks-bullish-tomorrow.jpg",
+        },
+        {
+          label: "BSE Equity",
+          tags: ["Buy/Sell"],
+          symbols: 0,
+          image: "/images/stocks-bullish-month.jpg",
+        },
+        {
+          label: "BSE F&O",
+          tags: ["Buy/Sell"],
           symbols: 0,
           image: "/images/stocks-bullish-month.jpg",
         },
