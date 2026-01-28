@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
 const { PatternDetector } = require("./pattern-detector");
+const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -306,6 +307,7 @@ class BseFoScanner {
     this.db = new FoDatabaseClient();
     this.analyzer = new TechnicalAnalyzer();
     this.patternDetector = new PatternDetector();
+    this.aiFilter = new AiBreakoutFilter();
     this.kite = null;
     this.instruments = [];
     this.scanInterval = null;
@@ -488,14 +490,37 @@ class BseFoScanner {
           oi_change: bestOption.oi_change,
           implied_volatility: parseFloat(bestOption.implied_volatility.toFixed(2)),
           confidence_score: 0.70, // Slightly lower for BSE (less liquid)
+          pattern: indexSignal.pattern,
+          pattern_confidence: indexSignal.pattern_confidence,
+          has_confirming_pattern: indexSignal.has_confirming_pattern,
         };
 
-        signals.push(signal);
+        // AI validation
+        const aiResult = await this.aiFilter.validateBreakout(signal, { 
+          patterns: indexSignal.pattern ? { strongest: { name: indexSignal.pattern, confidence: indexSignal.pattern_confidence } } : null,
+          historicalCandles: historicalData 
+        });
         
-        console.log(`   💾 Signal: ${signal.symbol} @ ₹${signal.entry_price} (OI: ${signal.open_interest.toLocaleString()})`);
+        if (this.aiFilter.shouldSaveSignal(aiResult, 0.7)) { // Higher threshold for F&O (70%)
+          // Merge AI result
+          const enrichedSignal = {
+            ...signal,
+            ai_verdict: aiResult.verdict,
+            ai_confidence: aiResult.confidence,
+            ai_reasoning: aiResult.reasoning,
+            ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+            ai_validated: aiResult.ai_validated,
+          };
 
-        // Save to database
-        await this.db.saveBseFoSignal(signal);
+          signals.push(enrichedSignal);
+          
+          console.log(`   💾 Signal: ${signal.symbol} @ ₹${signal.entry_price} (AI: ${aiResult.verdict}) (OI: ${signal.open_interest.toLocaleString()})`);
+
+          // Save to database
+          await this.db.saveBseFoSignal(enrichedSignal);
+        } else {
+          console.log(`   ❌ Rejected by AI: ${signal.symbol} (${aiResult.verdict})`);
+        }
 
       } catch (error) {
         console.error(`❌ Error scanning ${underlying}:`, error.message);

@@ -3,6 +3,7 @@ const { DatabaseClient } = require("./utils/database-client");
 const { TechnicalIndicators } = require("./utils/indicators");
 const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
 const { PatternDetector } = require("./pattern-detector");
+const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -44,6 +45,7 @@ class NseEquityScanner {
     this.db = new DatabaseClient(CONFIG);
     this.monitor = new ScannerMonitor('NSE_EQUITY');
     this.patternDetector = new PatternDetector();
+    this.aiFilter = new AiBreakoutFilter();
     this.symbols = [];
     this.scanInterval = null;
     this.cleanupInterval = null;
@@ -83,14 +85,42 @@ class NseEquityScanner {
 
     for (const symbolData of this.symbols) {
       try {
-        const { signal, type } = await this.analyzeSymbol(symbolData);
+        const { bullish, bearish, historical, patterns } = await this.analyzeSymbol(symbolData);
         
-        if (signal && type === 'bullish') {
-          await this.db.saveBullishSignal(signal, 'breakout_signals');
-          bullishSignals++;
-        } else if (signal && type === 'bearish') {
-          await this.db.saveBearishSignal(signal, 'intraday_bearish_signals');
-          bearishSignals++;
+        if (bullish) {
+          // AI validation for bullish signals
+          const aiResult = await this.aiFilter.validateBreakout(bullish, { patterns, historicalCandles: historical });
+          
+          if (this.aiFilter.shouldSaveSignal(aiResult)) {
+            // Merge AI result into signal
+            const enrichedSignal = {
+              ...bullish,
+              ai_verdict: aiResult.verdict,
+              ai_confidence: aiResult.confidence,
+              ai_reasoning: aiResult.reasoning,
+              ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+              ai_validated: aiResult.ai_validated,
+            };
+            await this.db.saveBullishSignal(enrichedSignal, 'breakout_signals');
+            bullishSignals++;
+          }
+        }
+        if (bearish) {
+          // AI validation for bearish signals
+          const aiResult = await this.aiFilter.validateBreakout(bearish, { patterns, historicalCandles: historical });
+          
+          if (this.aiFilter.shouldSaveSignal(aiResult)) {
+            const enrichedSignal = {
+              ...bearish,
+              ai_verdict: aiResult.verdict,
+              ai_confidence: aiResult.confidence,
+              ai_reasoning: aiResult.reasoning,
+              ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+              ai_validated: aiResult.ai_validated,
+            };
+            await this.db.saveBearishSignal(enrichedSignal, 'intraday_bearish_signals');
+            bearishSignals++;
+          }
         }
       } catch (error) {
         // Skip individual symbol errors, continue scanning
@@ -132,7 +162,7 @@ class NseEquityScanner {
     const volumeOk = TechnicalIndicators.checkYearlyVolume(daily);
 
     if (!ema20 || !rsi) {
-      return { signal: null, type: null };
+      return { bullish: null, bearish: null, historical, patterns: null };
     }
 
     // Detect chart patterns
@@ -142,17 +172,15 @@ class NseEquityScanner {
     const bullishSignal = this.checkBullishBreakout({
       symbol,
       currentPrice,
+      openPrice,
       ema20,
+      dailyEMA20,
       rsi,
       volatility,
       volumeOk,
       patterns,
       historical,
     });
-
-    if (bullishSignal) {
-      return { signal: bullishSignal, type: 'bullish' };
-    }
 
     // Check bearish breakdown
     const bearishSignal = this.checkBearishBreakdown({
@@ -165,11 +193,7 @@ class NseEquityScanner {
       historical,
     });
 
-    if (bearishSignal) {
-      return { signal: bearishSignal, type: 'bearish' };
-    }
-
-    return { signal: null, type: null };
+    return { bullish: bullishSignal, bearish: bearishSignal, historical, patterns };
   }
 
   checkBullishBreakout({ symbol, currentPrice, ema20, rsi, volatility, volumeOk, patterns, historical }) {
@@ -321,6 +345,7 @@ class NseEquityScanner {
     setInterval(() => {
       this.monitor.logStatus();
       this.monitor.logMemoryUsage();
+      this.aiFilter.logStats();
     }, 10 * 60 * 1000);
 
     console.log(`✅ Scanner running. Scanning every ${CONFIG.SCAN_INTERVAL_MS / 1000}s...`);

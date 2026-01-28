@@ -192,6 +192,54 @@ class DatabaseClient {
   }
 
   /**
+   * Save BSE Swing Positional Bullish Signal
+   */
+  async saveBseSwingBullishSignal(signal) {
+    return this.queryWithRetry(async () => {
+      const { error } = await this.supabase
+        .from('swing_positional_bullish')
+        .upsert(
+          {
+            ...signal,
+            exchange: 'BSE',
+            last_scanned_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "symbol",
+            ignoreDuplicates: false,
+          }
+        );
+
+      if (error) throw error;
+      return true;
+    });
+  }
+
+  /**
+   * Save BSE Swing Positional Bearish Signal
+   */
+  async saveBseSwingBearishSignal(signal) {
+    return this.queryWithRetry(async () => {
+      const { error } = await this.supabase
+        .from('swing_positional_bearish')
+        .upsert(
+          {
+            ...signal,
+            exchange: 'BSE',
+            last_scanned_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "symbol",
+            ignoreDuplicates: false,
+          }
+        );
+
+      if (error) throw error;
+      return true;
+    });
+  }
+
+  /**
    * Clean up stale signals (older than TTL)
    */
   async cleanupStaleSignals(tableName, ttlMinutes = 15) {

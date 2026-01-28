@@ -93,6 +93,38 @@ module.exports = {
       time: true,
       cron_restart: "0 9 * * 1-5",
     },
+    {
+      name: "nse-swing-positional-scanner",
+      script: "./scripts/nse-swing-positional-scanner.js",
+      instances: 1,
+      autorestart: false, // Runs once per day via cron
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+        SCANNER_NAME: "NSE_SWING_POSITIONAL",
+      },
+      error_file: "./logs/nse-swing-positional-error.log",
+      out_file: "./logs/nse-swing-positional-out.log",
+      time: true,
+      cron_restart: "0 16 * * 1-5", // 4:00 PM IST on weekdays (after market close)
+    },
+    {
+      name: "bse-swing-positional-scanner",
+      script: "./scripts/bse-swing-positional-scanner.js",
+      instances: 1,
+      autorestart: false, // Runs once per day via cron
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+        SCANNER_NAME: "BSE_SWING_POSITIONAL",
+      },
+      error_file: "./logs/bse-swing-positional-error.log",
+      out_file: "./logs/bse-swing-positional-out.log",
+      time: true,
+      cron_restart: "15 16 * * 1-5", // 4:15 PM IST on weekdays (15 mins after NSE)
+    },
   ],
 
   // Deploy configuration (optional - for PM2 deploy)
