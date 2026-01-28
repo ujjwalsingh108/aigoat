@@ -16,6 +16,91 @@ export default function Introduction() {
   return (
     <section className="w-full max-w-7xl mx-auto mt-8 px-4">
       <Card className="w-full max-w-7xl mx-auto p-6 bg-card/80 shadow-xl bg-gradient-to-tr from-gray-200 to-transparent dark:bg-none">
+        {/* NSE Stock Ticker */}
+        <div
+          className="relative w-full overflow-x-hidden mb-6 rounded-lg bg-black/5 dark:bg-white/5 flex items-center"
+          style={{ height: "48px" }}
+        >
+          <div
+            className="absolute items-center left-0 flex gap-4 animate-ticker"
+            style={{ whiteSpace: "nowrap", willChange: "transform", backfaceVisibility: "hidden" }}
+          >
+            {[...Array(3)].map((_, i) => (
+              <React.Fragment key={i}>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-blue-300">
+                  <span className="bg-blue-900 dark:bg-blue-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  RELIANCE <span className="text-green-400">▲ 1.25%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-green-300">
+                  <span className="bg-green-900 dark:bg-green-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  TCS <span className="text-green-400">▲ 0.82%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-purple-300">
+                  <span className="bg-purple-900 dark:bg-purple-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  HDFCBANK <span className="text-red-400">▼ 0.35%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-orange-300">
+                  <span className="bg-orange-900 dark:bg-orange-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  INFY <span className="text-green-400">▲ 1.15%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-cyan-300">
+                  <span className="bg-cyan-900 dark:bg-cyan-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  ICICIBANK <span className="text-green-400">▲ 0.67%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-yellow-300">
+                  <span className="bg-yellow-900 dark:bg-yellow-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  HINDUNILVR <span className="text-red-400">▼ 0.42%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-pink-300">
+                  <span className="bg-pink-900 dark:bg-pink-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  SBIN <span className="text-green-400">▲ 2.10%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-indigo-300">
+                  <span className="bg-indigo-900 dark:bg-indigo-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  BHARTIARTL <span className="text-green-400">▲ 0.95%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-teal-300">
+                  <span className="bg-teal-900 dark:bg-teal-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  ITC <span className="text-green-400">▲ 0.58%</span>
+                </div>
+                |
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-red-300">
+                  <span className="bg-red-900 dark:bg-red-400/20 rounded-full px-2 py-1 text-xs">
+                    NSE
+                  </span>
+                  KOTAKBANK <span className="text-red-400">▼ 0.28%</span>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
         <h1 className="text-3xl md:text-3xl font-bold text-center mb-4 dark:text-white text-black">
           The Most Powerful AI Platform
           <br />
@@ -78,64 +163,19 @@ export default function Introduction() {
             iconClassName="text-purple-400 w-5 h-5"
           />
         </div>
-      </Card>
-      <div
-        className="relative w-full overflow-x-hidden mt-4"
-        style={{ height: "48px" }}
-      >
-        <div
-          className="absolute items-center left-0 top-0 flex gap-4 animate-ticker"
-          style={{ whiteSpace: "nowrap", willChange: "transform" }}
-        >
-          {[...Array(1)].map((_, i) => (
-            <React.Fragment key={i}>
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-blue-300">
-                <span className="bg-green-900 dark:bg-green-400/20 rounded-full px-2 py-1 text-xs">
-                  SPDR
-                </span>
-                SPY <span className="text-green-400">▼ 0%</span>
-              </div>
-              |
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-yellow-400">
-                <span className="bg-yellow-900 dark:bg-yellow-400/20 rounded-full px-2 py-1 text-xs">
-                  iShares
-                </span>
-                IWM <span className="text-green-400">▲ 0.74%</span>
-              </div>
-              |
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-blue-300">
-                <span className="bg-green-900 dark:bg-green-400/20 rounded-full px-2 py-1 text-xs">
-                  SPDR
-                </span>
-                DIA <span className="text-green-400">▲ 0.52%</span>
-              </div>
-              |
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-yellow-400">
-                <span className="bg-yellow-900 dark:bg-yellow-400/20 rounded-full px-2 py-1 text-xs">
-                  BTC
-                </span>
-                BTC <span className="text-green-400">▲ 0.08%</span>
-              </div>
-              |
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-red-400">
-                <span className="bg-red-900 dark:bg-red-400/20 rounded-full px-2 py-1 text-xs">
-                  TSLA
-                </span>
-                TSLA <span className="text-red-400">▼ 1.42%</span>
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
         <style>{`
           @keyframes ticker {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-100%); }
+            0% { transform: translateX(0%); }
+            100% { transform: translateX(-50%); }
           }
           .animate-ticker {
-            animation: ticker 30s linear infinite;
+            animation: ticker 60s linear infinite;
+            backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
           }
         `}</style>
-      </div>
+      </Card>
     </section>
   );
 }
