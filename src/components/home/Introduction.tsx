@@ -12,6 +12,51 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { FeatureCard } from "./FeatureCard";
 
+interface StockData {
+  symbol: string;
+  variation: number;
+  price: number;
+}
+
+const STOCK_COLORS = [
+  "text-blue-300",
+  "text-green-300",
+  "text-purple-300",
+  "text-orange-300",
+  "text-cyan-300",
+  "text-yellow-300",
+  "text-pink-300",
+  "text-indigo-300",
+  "text-teal-300",
+  "text-red-300",
+];
+
+const BADGE_COLORS = [
+  "bg-blue-900 dark:bg-blue-400/20",
+  "bg-green-900 dark:bg-green-400/20",
+  "bg-purple-900 dark:bg-purple-400/20",
+  "bg-orange-900 dark:bg-orange-400/20",
+  "bg-cyan-900 dark:bg-cyan-400/20",
+  "bg-yellow-900 dark:bg-yellow-400/20",
+  "bg-pink-900 dark:bg-pink-400/20",
+  "bg-indigo-900 dark:bg-indigo-400/20",
+  "bg-teal-900 dark:bg-teal-400/20",
+  "bg-red-900 dark:bg-red-400/20",
+];
+
+const NSE_STOCKS: StockData[] = [
+  { symbol: "RELIANCE", variation: 1.25, price: 2450 },
+  { symbol: "TCS", variation: 0.82, price: 3750 },
+  { symbol: "HDFCBANK", variation: -0.35, price: 1650 },
+  { symbol: "INFY", variation: 1.15, price: 1580 },
+  { symbol: "ICICIBANK", variation: 0.67, price: 1120 },
+  { symbol: "HINDUNILVR", variation: -0.42, price: 2380 },
+  { symbol: "SBIN", variation: 2.10, price: 780 },
+  { symbol: "BHARTIARTL", variation: 0.95, price: 1450 },
+  { symbol: "ITC", variation: 0.58, price: 465 },
+  { symbol: "KOTAKBANK", variation: -0.28, price: 1750 },
+];
+
 export default function Introduction() {
   return (
     <section className="w-full max-w-7xl mx-auto mt-8 px-4">
@@ -27,75 +72,20 @@ export default function Introduction() {
           >
             {[...Array(3)].map((_, i) => (
               <React.Fragment key={i}>
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-blue-300">
-                  <span className="bg-blue-900 dark:bg-blue-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  RELIANCE <span className="text-green-400">▲ 1.25%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-green-300">
-                  <span className="bg-green-900 dark:bg-green-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  TCS <span className="text-green-400">▲ 0.82%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-purple-300">
-                  <span className="bg-purple-900 dark:bg-purple-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  HDFCBANK <span className="text-red-400">▼ 0.35%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-orange-300">
-                  <span className="bg-orange-900 dark:bg-orange-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  INFY <span className="text-green-400">▲ 1.15%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-cyan-300">
-                  <span className="bg-cyan-900 dark:bg-cyan-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  ICICIBANK <span className="text-green-400">▲ 0.67%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-yellow-300">
-                  <span className="bg-yellow-900 dark:bg-yellow-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  HINDUNILVR <span className="text-red-400">▼ 0.42%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-pink-300">
-                  <span className="bg-pink-900 dark:bg-pink-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  SBIN <span className="text-green-400">▲ 2.10%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-indigo-300">
-                  <span className="bg-indigo-900 dark:bg-indigo-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  BHARTIARTL <span className="text-green-400">▲ 0.95%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-teal-300">
-                  <span className="bg-teal-900 dark:bg-teal-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  ITC <span className="text-green-400">▲ 0.58%</span>
-                </div>
-                |
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full text-red-300">
-                  <span className="bg-red-900 dark:bg-red-400/20 rounded-full px-2 py-1 text-xs">
-                    NSE
-                  </span>
-                  KOTAKBANK <span className="text-red-400">▼ 0.28%</span>
-                </div>
+                {NSE_STOCKS.map((stock, index) => (
+                  <React.Fragment key={`${stock.symbol}-${i}`}>
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${STOCK_COLORS[index]}`}>
+                      <span className={`${BADGE_COLORS[index]} rounded-full px-2 py-1 text-xs`}>
+                        NSE
+                      </span>
+                      {stock.symbol}{" "}
+                      <span className={stock.variation >= 0 ? "text-green-400" : "text-red-400"}>
+                        {stock.variation >= 0 ? "▲" : "▼"} {Math.abs(stock.variation)}%
+                      </span>
+                    </div>
+                    {index < NSE_STOCKS.length - 1 && "|"}
+                  </React.Fragment>
+                ))}
               </React.Fragment>
             ))}
           </div>
