@@ -30,8 +30,6 @@ export function ScreenerCard({
       router.push(`/screener/swing-positional-bullish`);
     } else if (label === "Swing Positional Equity Bearish (1-15 days)") {
       router.push(`/screener/swing-positional-bearish`);
-    } else if (label === "BANKNIFTY F&O") {
-      router.push(`/screener/banknifty-fo`);
     } else if (label === "NIFTY & BANKNIFTY F&O") {
       router.push(`/screener/nse-fo`);
     } else if (label === "BSE Bullish Breakout") {
@@ -40,8 +38,6 @@ export function ScreenerCard({
       router.push(`/screener/bse-bearish`);
     } else if (label === "BSE F&O") {
       router.push(`/screener/bse-fo`);
-    } else if (label === "NIFTY F&O") {
-      router.push(`/screener/nifty-fo`);
     } else if (label === "Intraday Index (NIFTY / BANKNIFTY)") {
       router.push(`/screener/intraday-index`);
     } else if (label === "Swing Positional Index (NIFTY / BANKNIFTY)") {
