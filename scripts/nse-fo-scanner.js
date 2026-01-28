@@ -1,6 +1,6 @@
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
-const { KiteConnect, KiteTicker } = require("kiteconnect");
+const { PatternDetector } = require("./pattern-detector");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -10,10 +10,6 @@ const CONFIG = {
   // Supabase connection
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-
-  // Zerodha KiteConnect configuration
-  KITE_API_KEY: process.env.KITE_API_KEY,
-  KITE_ACCESS_TOKEN: process.env.KITE_ACCESS_TOKEN,
 
   // Scanner settings
   CANDLE_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
@@ -214,6 +210,25 @@ class TechnicalAnalyzer {
     return Math.max(...highs);
   }
 
+  detectPatterns(candles) {
+    try {
+      if (!candles || candles.length < 10) return null;
+      
+      // Convert to format expected by PatternDetector
+      const formattedCandles = candles.map(c => ({
+        open: parseFloat(c.open),
+        high: parseFloat(c.high),
+        low: parseFloat(c.low),
+        close: parseFloat(c.close),
+        volume: parseInt(c.volume || 0)
+      }));
+      
+      return this.patternDetector.detectAllPatterns(formattedCandles);
+    } catch (error) {
+      return null;
+    }
+  }
+
   analyzeIntradayIndex(underlying, historicalCandles, currentPrice) {
     if (!currentPrice || !historicalCandles || historicalCandles.length < CONFIG.EMA_PERIOD) {
       return null;
@@ -229,6 +244,12 @@ class TechnicalAnalyzer {
     const swingHigh = this.findRecentSwingHigh(historicalCandles, 10);
 
     let signal = null;
+
+    // Detect chart patterns
+    const patterns = this.detectPatterns(historicalCandles);
+    const hasConfirmingPattern = patterns && patterns.strongest && 
+      ((currentPrice > ema20 && patterns.strongest.type.includes('bullish')) ||
+       (currentPrice < ema20 && patterns.strongest.type.includes('bearish')));
 
     // LONG SIGNAL: Price > EMA20 AND within 150 points of swing low
     if (currentPrice > ema20 && swingLow) {
@@ -246,6 +267,9 @@ class TechnicalAnalyzer {
           target1_index: parseFloat((currentPrice + CONFIG.TARGET1_POINTS).toFixed(2)),
           target2_index: parseFloat((currentPrice + CONFIG.TARGET2_POINTS).toFixed(2)),
           stop_loss_index: parseFloat(swingLow.toFixed(2)),
+          pattern: patterns?.strongest?.name || null,
+          pattern_confidence: patterns?.strongest?.confidence || null,
+          has_confirming_pattern: hasConfirmingPattern,
         };
       }
     }
@@ -265,6 +289,9 @@ class TechnicalAnalyzer {
           target1_index: parseFloat((currentPrice - CONFIG.TARGET1_POINTS).toFixed(2)),
           target2_index: parseFloat((currentPrice - CONFIG.TARGET2_POINTS).toFixed(2)),
           stop_loss_index: parseFloat(swingHigh.toFixed(2)),
+          pattern: patterns?.strongest?.name || null,
+          pattern_confidence: patterns?.strongest?.confidence || null,
+          has_confirming_pattern: hasConfirmingPattern,
         };
       }
     }
@@ -281,6 +308,7 @@ class NseFoScanner {
   constructor() {
     this.db = new FoDatabaseClient();
     this.analyzer = new TechnicalAnalyzer();
+    this.patternDetector = new PatternDetector();
     this.kite = null;
     this.instruments = [];
     this.underlyingPrices = new Map(); // Track NIFTY, BANKNIFTY, FINNIFTY prices
@@ -297,11 +325,6 @@ class NseFoScanner {
     `);
 
     try {
-      this.kite = new KiteConnect({
-        api_key: CONFIG.KITE_API_KEY,
-      });
-      this.kite.setAccessToken(CONFIG.KITE_ACCESS_TOKEN);
-
       this.instruments = await this.db.getNseFoInstruments();
 
       if (this.instruments.length === 0) {
@@ -318,20 +341,12 @@ class NseFoScanner {
 
   async getUnderlyingPrice(underlying) {
     try {
-      // Map to spot indices
-      const instrumentMap = {
-        'NIFTY': 'NSE:NIFTY 50',
-        'BANKNIFTY': 'NSE:NIFTY BANK',
-        'FINNIFTY': 'NSE:NIFTY FIN SERVICE'
-      };
-
-      const instrument = instrumentMap[underlying];
-      if (!instrument) return null;
-
-      const quote = await this.kite.getQuote([instrument]);
-      const data = quote[instrument];
+      // Get latest candle from historical data
+      const historical = await this.db.getHistoricalData(underlying, 1);
       
-      return data?.last_price || null;
+      if (historical.length === 0) return null;
+      
+      return parseFloat(historical[0].close);
     } catch (error) {
       console.error(`❌ Error fetching ${underlying} price:`, error.message);
       return null;
@@ -366,35 +381,32 @@ class NseFoScanner {
 
     if (candidates.length === 0) return null;
 
-    // Get quotes and OI for all candidates
-    const instrumentTokens = candidates.map(c => `NFO:${c.symbol}`);
-    
+    // Get latest data for all candidates from historical database
     try {
-      const quotes = await this.kite.getQuote(instrumentTokens);
-      
       // Select strike with highest OI that meets threshold
       let bestOption = null;
       let highestOI = 0;
 
       for (const candidate of candidates) {
-        const quoteKey = `NFO:${candidate.symbol}`;
-        const quote = quotes[quoteKey];
+        // Get latest historical data for this option
+        const optionHistory = await this.db.getHistoricalData(candidate.symbol, 1);
         
-        if (!quote) continue;
+        if (optionHistory.length === 0) continue;
 
-        const oi = quote.oi || 0;
-        const oiChange = quote.oi_day_high - quote.oi_day_low || 0;
+        const latestCandle = optionHistory[0];
+        const oi = parseInt(latestCandle.oi || 0);
+        const volume = parseInt(latestCandle.volume || 0);
 
         if (oi >= CONFIG.MIN_OI_THRESHOLD && oi > highestOI) {
           highestOI = oi;
           bestOption = {
             ...candidate,
-            entry_price: quote.last_price,
+            entry_price: parseFloat(latestCandle.close),
             open_interest: oi,
-            oi_change: oiChange,
-            implied_volatility: quote.last_price / indexPrice * 100, // Rough IV approximation
-            bid: quote.depth?.buy?.[0]?.price || 0,
-            ask: quote.depth?.sell?.[0]?.price || 0,
+            oi_change: volume, // Use volume as proxy for OI change
+            implied_volatility: 0, // Set to 0 or calculate if IV data available
+            bid: parseFloat(latestCandle.close) * 0.995, // Approximate bid
+            ask: parseFloat(latestCandle.close) * 1.005, // Approximate ask
           };
         }
       }
