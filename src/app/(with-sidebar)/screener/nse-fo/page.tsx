@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,14 @@ import {
   ArrowLeft,
   TrendingDown,
 } from "lucide-react";
+import { AIScreenerButton } from "@/components/screener/AIScreenerButton";
+
+// Lazy load AI panel (code-split for performance)
+const AIScreenerPanel = lazy(() =>
+  import("@/components/screener/AIScreenerPanel").then((mod) => ({
+    default: mod.AIScreenerPanel,
+  }))
+);
 
 export default function NseFOPage() {
   const router = useRouter();
@@ -20,6 +28,7 @@ export default function NseFOPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [filter, setFilter] = useState<string>("ALL"); // ALL, NIFTY, BANKNIFTY, FINNIFTY
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
   // Load NSE F&O signals
   const loadSignals = useCallback(async () => {
@@ -93,6 +102,14 @@ export default function NseFOPage() {
           <span className="text-xs text-muted-foreground">
             Updated: {lastUpdate.toLocaleTimeString()}
           </span>
+
+          {/* AI Button (Auth-gated, only renders if authenticated) */}
+          <AIScreenerButton
+            signals={filteredSignals}
+            screenerType="nse-fo"
+            onOpenPanel={() => setIsAIPanelOpen(true)}
+            isLoading={isLoading}
+          />
 
           <Button
             variant="outline"
@@ -296,6 +313,17 @@ export default function NseFOPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* AI Screener Panel (lazy loaded, Suspense boundary) */}
+      {isAIPanelOpen && (
+        <Suspense fallback={null}>
+          <AIScreenerPanel
+            signals={filteredSignals}
+            screenerType="nse-fo"
+            onClose={() => setIsAIPanelOpen(false)}
+          />
+        </Suspense>
       )}
     </div>
   );

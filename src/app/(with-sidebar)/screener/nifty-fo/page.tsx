@@ -14,12 +14,21 @@ import {
   ArrowLeft,
   TrendingDown,
 } from "lucide-react";
+import { AIScreenerButton } from "@/components/screener/AIScreenerButton";
+
+// Lazy load AI panel (code-split for performance)
+const AIScreenerPanel = lazy(() =>
+  import("@/components/screener/AIScreenerPanel").then((mod) => ({
+    default: mod.AIScreenerPanel,
+  }))
+);
 
 export default function NiftyFOPage() {
   const router = useRouter();
   const [signals, setSignals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -98,6 +107,14 @@ export default function NiftyFOPage() {
           <span className="text-xs text-muted-foreground">
             Updated: {lastUpdate.toLocaleTimeString()}
           </span>
+
+          {/* AI Button (Auth-gated, only renders if authenticated) */}
+          <AIScreenerButton
+            signals={signals}
+            screenerType="nifty-fo"
+            onOpenPanel={() => setIsAIPanelOpen(true)}
+            isLoading={isLoading}
+          />
 
           <Button
             variant="outline"
@@ -234,6 +251,17 @@ export default function NiftyFOPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* AI Screener Panel (lazy loaded, Suspense boundary) */}
+      {isAIPanelOpen && (
+        <Suspense fallback={null}>
+          <AIScreenerPanel
+            signals={signals}
+            screenerType="nifty-fo"
+            onClose={() => setIsAIPanelOpen(false)}
+          />
+        </Suspense>
       )}
     </div>
   );

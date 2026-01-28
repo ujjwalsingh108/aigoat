@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -14,12 +14,21 @@ import {
   ArrowLeft,
   TrendingDown,
 } from "lucide-react";
+import { AIScreenerButton } from "@/components/screener/AIScreenerButton";
+
+// Lazy load AI panel (code-split for performance)
+const AIScreenerPanel = lazy(() =>
+  import("@/components/screener/AIScreenerPanel").then((mod) => ({
+    default: mod.AIScreenerPanel,
+  }))
+);
 
 export default function BankNiftyFOPage() {
   const router = useRouter();
   const [signals, setSignals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -97,6 +106,14 @@ export default function BankNiftyFOPage() {
           <span className="text-xs text-muted-foreground">
             Updated: {lastUpdate.toLocaleTimeString()}
           </span>
+
+          {/* AI Button (Auth-gated, only renders if authenticated) */}
+          <AIScreenerButton
+            signals={signals}
+            screenerType="banknifty-fo"
+            onOpenPanel={() => setIsAIPanelOpen(true)}
+            isLoading={isLoading}
+          />
 
           <Button
             variant="outline"
@@ -233,6 +250,17 @@ export default function BankNiftyFOPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* AI Screener Panel (lazy loaded, Suspense boundary) */}
+      {isAIPanelOpen && (
+        <Suspense fallback={null}>
+          <AIScreenerPanel
+            signals={signals}
+            screenerType="banknifty-fo"
+            onClose={() => setIsAIPanelOpen(false)}
+          />
+        </Suspense>
       )}
     </div>
   );
