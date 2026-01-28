@@ -32,6 +32,8 @@ export function ScreenerCard({
       router.push(`/screener/swing-positional-bearish`);
     } else if (label === "BANKNIFTY F&O") {
       router.push(`/screener/banknifty-fo`);
+    } else if (label === "NIFTY & BANKNIFTY F&O") {
+      router.push(`/screener/nse-fo`);
     } else if (label === "BSE Bullish Breakout") {
       router.push(`/screener/bse-bullish`);
     } else if (label === "BSE Bearish Breakdown") {

@@ -17,7 +17,10 @@
     "fetch-historical-bse-equity": "tsx scripts/fetch-historical-bse-equity.ts",
     "fetch-historical-nse-fo": "tsx scripts/fetch-historical-nse-fo.ts",
     "fetch-historical-bse-fo": "tsx scripts/fetch-historical-bse-fo.ts",
-    "fetch-historical-all": "npm run fetch-historical-nse-equity && npm run fetch-historical-bse-equity && npm run fetch-historical-nse-fo && npm run fetch-historical-bse-fo"
+    "fetch-historical-all": "npm run fetch-historical-nse-equity && npm run fetch-historical-bse-equity && npm run fetch-historical-nse-fo && npm run fetch-historical-bse-fo",
+    "scanner:nse-fo": "node scripts/nse-fo-scanner.js",
+    "scanner:bse-fo": "node scripts/bse-fo-scanner.js",
+    "scanner:all-fo": "concurrently \"npm run scanner:nse-fo\" \"npm run scanner:bse-fo\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

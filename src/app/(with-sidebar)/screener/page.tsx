@@ -24,8 +24,7 @@ export default function Screener() {
   const [bearishCount, setBearishCount] = useState(0);
   
   // Indices symbol counts
-  const [niftyFoCount, setNiftyFoCount] = useState(0);
-  const [bankniftyFoCount, setBankniftyFoCount] = useState(0);
+  const [nseFoCount, setNseFoCount] = useState(0); // Combined NIFTY + BANKNIFTY
   const [bseFoCount, setBseFoCount] = useState(0);
   const [bseBullishCount, setBseBullishCount] = useState(0);
   const [bseBearishCount, setBseBearishCount] = useState(0);
@@ -75,15 +74,17 @@ export default function Screener() {
   useEffect(() => {
     const fetchIndicesCounts = async () => {
       try {
-        // Fetch NIFTY F&O count
-        const niftyFoResponse = await fetch("/api/symbols/nse-fo?underlying=NIFTY&limit=1000");
-        const niftyFoData = await niftyFoResponse.json();
-        setNiftyFoCount(niftyFoData.count || 0);
-
-        // Fetch BANKNIFTY F&O count
-        const bankniftyFoResponse = await fetch("/api/symbols/nse-fo?underlying=BANKNIFTY&limit=1000");
-        const bankniftyFoData = await bankniftyFoResponse.json();
-        setBankniftyFoCount(bankniftyFoData.count || 0);
+        // Fetch NSE F&O signals (NIFTY + BANKNIFTY + FINNIFTY combined)
+        const nseFoResponse = await fetch("/api/signals/nse-fo");
+        const nseFoData = await nseFoResponse.json();
+        
+        if (nseFoData.success && nseFoData.data?.grouped) {
+          // Combine NIFTY + BANKNIFTY + FINNIFTY counts
+          const niftyCount = nseFoData.data.grouped.NIFTY?.length || 0;
+          const bankniftyCount = nseFoData.data.grouped.BANKNIFTY?.length || 0;
+          const finniftyCount = nseFoData.data.grouped.FINNIFTY?.length || 0;
+          setNseFoCount(niftyCount + bankniftyCount + finniftyCount);
+        }
 
         // Fetch BSE Equity count for BSE bullish/bearish cards
         const bseEquityResponse = await fetch("/api/symbols/bse-equity?limit=1000");
@@ -91,16 +92,23 @@ export default function Screener() {
         setBseBullishCount(bseEquityData.count || 0);
         setBseBearishCount(bseEquityData.count || 0);
 
-        // Fetch BSE F&O count
-        const bseFoResponse = await fetch("/api/symbols/bse-fo?limit=1000");
+        // Fetch BSE F&O signals (SENSEX + BANKEX combined)
+        const bseFoResponse = await fetch("/api/signals/bse-fo");
         const bseFoData = await bseFoResponse.json();
-        setBseFoCount(bseFoData.count || 0);
+        
+        if (bseFoData.success && bseFoData.data?.count) {
+          setBseFoCount(bseFoData.data.count || 0);
+        }
       } catch (error) {
         console.error("Error fetching indices counts:", error);
       }
     };
 
     fetchIndicesCounts();
+    
+    // Refresh indices counts every 60 seconds
+    const interval = setInterval(fetchIndicesCounts, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const screenerData = [
@@ -159,15 +167,9 @@ export default function Screener() {
       title: "Indices",
       items: [
         {
-          label: "NIFTY F&O",
+          label: "NIFTY & BANKNIFTY F&O",
           tags: ["Buy/Sell"],
-          symbols: niftyFoCount,
-          image: "/images/stocks-bullish-tomorrow.jpg",
-        },
-        {
-          label: "BANKNIFTY F&O",
-          tags: ["Buy/Sell"],
-          symbols: bankniftyFoCount,
+          symbols: nseFoCount,
           image: "/images/stocks-bullish-tomorrow.jpg",
         },
         {
