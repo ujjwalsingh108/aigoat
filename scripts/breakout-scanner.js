@@ -116,7 +116,7 @@ class DatabaseClient {
 
       // Fetch last N 5-min candles
       const { data, error } = await this.supabase
-        .from("historical_prices")
+        .from("historical_prices_nse_equity")
         .select("*")
         .eq("symbol", symbol)
         .gte("time", "09:15")
@@ -168,7 +168,7 @@ class DatabaseClient {
       startDate.setDate(startDate.getDate() - daysToFetch);
 
       const { data, error } = await this.supabase
-        .from("historical_prices")
+        .from("historical_prices_nse_equity")
         .select("date, time, open, high, low, close, volume")
         .eq("symbol", symbol)
         .eq("time", "15:30")
@@ -209,7 +209,7 @@ class DatabaseClient {
       }
 
       const { data, error } = await this.supabase
-        .from("historical_prices")
+        .from("historical_prices_nse_equity")
         .select("date, time, open, high, low, close, volume")
         .eq("symbol", symbol)
         .gte("time", "09:15")
@@ -248,7 +248,7 @@ class DatabaseClient {
       }
 
       const { data, error } = await this.supabase
-        .from("historical_prices")
+        .from("historical_prices_nse_equity")
         .select("date, time, open, high, low, close, volume")
         .eq("symbol", symbol)
         .gte("time", "09:15")

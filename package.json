@@ -12,7 +12,12 @@
     "fetch-bse-symbols": "tsx scripts/fetch-bse-equity-symbols.ts",
     "fetch-nse-fo": "tsx scripts/fetch-nse-fo-symbols.ts",
     "fetch-bse-fo": "tsx scripts/fetch-bse-fo-symbols.ts",
-    "cleanup-expired-fo": "tsx scripts/cleanup-expired-fo-symbols.ts"
+    "cleanup-expired-fo": "tsx scripts/cleanup-expired-fo-symbols.ts",
+    "fetch-historical-nse-equity": "tsx scripts/fetch-historical-nse-equity.ts",
+    "fetch-historical-bse-equity": "tsx scripts/fetch-historical-bse-equity.ts",
+    "fetch-historical-nse-fo": "tsx scripts/fetch-historical-nse-fo.ts",
+    "fetch-historical-bse-fo": "tsx scripts/fetch-historical-bse-fo.ts",
+    "fetch-historical-all": "npm run fetch-historical-nse-equity && npm run fetch-historical-bse-equity && npm run fetch-historical-nse-fo && npm run fetch-historical-bse-fo"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
