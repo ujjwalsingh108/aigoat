@@ -2,7 +2,7 @@
  * Fetch BSE Equity Symbols from Zerodha Kite
  * 
  * This script fetches all BSE equity instruments from Kite Connect API
- * and stores them in the kite_bse_equity_symbols table in Supabase.
+ * and stores them in the all_bse_equity_symbols table in Supabase.
  */
 
 import { KiteConnect } from "kiteconnect";
@@ -119,7 +119,7 @@ async function storeBSESymbolsInSupabase(symbols: BSEEquitySymbol[]): Promise<vo
     // Delete existing records to refresh data
     console.log("Clearing existing BSE equity symbols...");
     const { error: deleteError } = await supabase
-      .from("kite_bse_equity_symbols")
+      .from("all_bse_equity_symbols")
       .delete()
       .neq("symbol", ""); // Delete all records
 
@@ -140,7 +140,7 @@ async function storeBSESymbolsInSupabase(symbols: BSEEquitySymbol[]): Promise<vo
       console.log(`Processing batch ${batchNumber}/${totalBatches} (${batch.length} symbols)...`);
 
       const { data, error } = await supabase
-        .from("kite_bse_equity_symbols")
+        .from("all_bse_equity_symbols")
         .insert(batch)
         .select();
 
@@ -193,7 +193,7 @@ async function main() {
     console.log("✓ BSE EQUITY SYMBOLS SYNC COMPLETED");
     console.log("=".repeat(70));
     console.log(`\n${bseEquities.length} BSE equity symbols are now available in your database`);
-    console.log("You can query them from the 'kite_bse_equity_symbols' table\n");
+    console.log("You can query them from the 'all_bse_equity_symbols' table\n");
 
     return true;
   } catch (error) {
