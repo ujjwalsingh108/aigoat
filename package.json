@@ -19,6 +19,7 @@
     "fetch-historical-bse-fo": "tsx scripts/fetch-historical-bse-fo.ts",
     "fetch-20day-historical-nse": "tsx scripts/fetch-20day-historical-nse.ts",
     "fetch-20day-historical-bse": "tsx scripts/fetch-20day-historical-bse.ts",
+    "fetch-swing-daily-candles": "tsx scripts/fetch-swing-daily-candles.ts",
     "fetch-bse-symbols-from-spreadsheet": "tsx scripts/fetch-bse-symbols-from-spreadsheet.ts",
     "import-bse-symbols-from-spreadsheet": "tsx scripts/import-bse-symbols-from-spreadsheet.ts",
     "fetch-historical-all": "npm run fetch-historical-nse-equity && npm run fetch-historical-bse-equity && npm run fetch-historical-nse-fo && npm run fetch-historical-bse-fo",
