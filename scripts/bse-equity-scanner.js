@@ -4,6 +4,7 @@ const { TechnicalIndicators } = require("./utils/indicators");
 const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
 const { PatternDetector } = require("./pattern-detector");
 const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
+const cache = require("./memory-cache");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -137,11 +138,24 @@ class BseEquityScanner {
   async analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch historical and daily data
-    const [historical, daily] = await Promise.all([
-      this.db.getHistoricalData(symbol, 'historical_prices_bse_equity', 50),
-      this.db.getDailyCandles(symbol, 'historical_prices_bse_equity', 365),
-    ]);
+    // Fetch historical and daily data with cache
+    const historicalCacheKey = `bse_eq_hist_${symbol}_50`;
+    const dailyCacheKey = `bse_eq_daily_${symbol}_365`;
+    
+    let historical = cache.get(historicalCacheKey);
+    let daily = cache.get(dailyCacheKey);
+    
+    if (!historical || !daily) {
+      [historical, daily] = await Promise.all([
+        this.db.getHistoricalData(symbol, 'historical_prices_bse_equity', 50),
+        this.db.getDailyCandles(symbol, 'historical_prices_bse_equity', 365),
+      ]);
+      
+      // Cache 5-min data for 5 minutes (gets fresh data every few scans)
+      cache.set(historicalCacheKey, historical, 300);
+      // Cache daily data for 1 hour (doesn't change intraday)
+      cache.set(dailyCacheKey, daily, 3600);
+    }
 
     if (historical.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS || daily.length === 0) {
       return { bullish: null, bearish: null, historical, patterns: null };
@@ -299,8 +313,8 @@ class BseEquityScanner {
 
   async cleanupStaleSignals() {
     try {
-      await this.db.cleanupStaleSignals('breakout_signals', CONFIG.SIGNAL_TTL_MINUTES);
-      await this.db.cleanupStaleSignals('intraday_bearish_signals', CONFIG.SIGNAL_TTL_MINUTES);
+      await this.db.cleanupStaleSignals('bullish_breakout_bse_eq', CONFIG.SIGNAL_TTL_MINUTES);
+      await this.db.cleanupStaleSignals('bearish_breakout_bse_eq', CONFIG.SIGNAL_TTL_MINUTES);
       console.log(`🧹 Cleaned up stale signals older than ${CONFIG.SIGNAL_TTL_MINUTES} minutes`);
     } catch (error) {
       console.error('❌ Cleanup failed:', error.message);

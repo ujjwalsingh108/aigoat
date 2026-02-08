@@ -4,6 +4,7 @@ const { TechnicalIndicators } = require("./utils/indicators");
 const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
 const { PatternDetector } = require("./pattern-detector");
 const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
+const cache = require("./memory-cache");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -112,7 +113,7 @@ class BseSwingPositionalScanner {
               ai_validated: aiResult.ai_validated,
             };
             
-            await this.db.saveBseSwingBullishSignal(enrichedSignal);
+            await this.db.saveBullishSignal(enrichedSignal, 'bse_swing_positional_bullish');
             bullishSignals++;
           }
         }
@@ -134,7 +135,7 @@ class BseSwingPositionalScanner {
               ai_validated: aiResult.ai_validated,
             };
             
-            await this.db.saveBseSwingBearishSignal(enrichedSignal);
+            await this.db.saveBearishSignal(enrichedSignal, 'bse_swing_positional_bearish');
             bearishSignals++;
           }
         }
@@ -158,8 +159,15 @@ class BseSwingPositionalScanner {
   async analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch daily candles (need at least 365 days for volume + 50 for SMA)
-    const dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_bse_equity', 365);
+    // Fetch daily candles with cache (365 days for volume + 50 for SMA)
+    const cacheKey = `bse_swing_daily_${symbol}_365`;
+    let dailyCandles = cache.get(cacheKey);
+    
+    if (!dailyCandles) {
+      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_bse_swing_hourly', 365);
+      // Cache for 23 hours (refreshes before next daily scan)
+      cache.set(cacheKey, dailyCandles, 82800);
+    }
 
     if (dailyCandles.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
       return { bullish: null, bearish: null, patterns: null, dailyCandles };

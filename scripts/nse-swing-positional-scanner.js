@@ -4,6 +4,7 @@ const { TechnicalIndicators } = require("./utils/indicators");
 const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
 const { PatternDetector } = require("./pattern-detector");
 const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
+const cache = require("./memory-cache");
 
 // =================================================================
 // 🔧 CONFIGURATION
@@ -112,7 +113,7 @@ class NseSwingPositionalScanner {
               ai_validated: aiResult.ai_validated,
             };
             
-            await this.db.saveBullishSignal(enrichedSignal, 'swing_positional_bullish');
+            await this.db.saveBullishSignal(enrichedSignal, 'nse_swing_positional_bullish');
             bullishSignals++;
           }
         }
@@ -134,7 +135,7 @@ class NseSwingPositionalScanner {
               ai_validated: aiResult.ai_validated,
             };
             
-            await this.db.saveBearishSignal(enrichedSignal, 'swing_positional_bearish');
+            await this.db.saveBearishSignal(enrichedSignal, 'nse_swing_positional_bearish');
             bearishSignals++;
           }
         }
@@ -158,8 +159,15 @@ class NseSwingPositionalScanner {
   async analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch daily candles (need at least 365 days for volume + 50 for SMA)
-    const dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_nse_equity', 365);
+    // Fetch daily candles with cache (365 days for volume + 50 for SMA)
+    const cacheKey = `nse_swing_daily_${symbol}_365`;
+    let dailyCandles = cache.get(cacheKey);
+    
+    if (!dailyCandles) {
+      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_nse_swing_hourly', 365);
+      // Cache for 23 hours (refreshes before next daily scan)
+      cache.set(cacheKey, dailyCandles, 82800);
+    }
 
     if (dailyCandles.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
       return { bullish: null, bearish: null, patterns: null, dailyCandles };
@@ -368,8 +376,8 @@ class NseSwingPositionalScanner {
       const ttlMs = CONFIG.SIGNAL_TTL_DAYS * 24 * 60 * 60 * 1000;
       const ttlMinutes = CONFIG.SIGNAL_TTL_DAYS * 24 * 60;
       
-      await this.db.cleanupStaleSignals('swing_positional_bullish', ttlMinutes);
-      await this.db.cleanupStaleSignals('swing_positional_bearish', ttlMinutes);
+      await this.db.cleanupStaleSignals('nse_swing_positional_bullish', ttlMinutes);
+      await this.db.cleanupStaleSignals('nse_swing_positional_bearish', ttlMinutes);
       console.log(`🧹 Cleaned up swing signals older than ${CONFIG.SIGNAL_TTL_DAYS} days`);
     } catch (error) {
       console.error('❌ Cleanup failed:', error.message);
