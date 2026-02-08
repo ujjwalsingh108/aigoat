@@ -143,7 +143,7 @@ async function fetchSymbolData(
     const { error } = await supabase
       .from("historical_prices_bse_equity")
       .upsert(dataToInsert, {
-        onConflict: "symbol,date,time",
+        onConflict: "symbol,timestamp",
         ignoreDuplicates: false,
       });
 
