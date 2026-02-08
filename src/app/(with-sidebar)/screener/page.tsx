@@ -213,13 +213,13 @@ export default function Screener() {
       title: "Swing Positional (NSE)",
       items: [
         {
-          label: "Swing Positional Equity Bullish (1-15 days)",
+          label: "NSE Swing Positional Bullish",
           tags: ["Bullish"],
           symbols: nseSwingBullishCount,
           image: "/images/stocks-bullish-month.jpg",
         },
         {
-          label: "Swing Positional Equity Bearish (1-15 days)",
+          label: "NSE Swing Positional Bearish",
           tags: ["Bearish"],
           symbols: nseSwingBearishCount,
           image: "/images/stocks-bearish-daytrading.jpg",
@@ -230,13 +230,13 @@ export default function Screener() {
       title: "Swing Positional (BSE)",
       items: [
         {
-          label: "BSE Swing Positional Bullish (1-15 days)",
+          label: "BSE Swing Positional Bullish",
           tags: ["Bullish"],
           symbols: bseSwingBullishCount,
           image: "/images/stocks-bullish-month.jpg",
         },
         {
-          label: "BSE Swing Positional Bearish (1-15 days)",
+          label: "BSE Swing Positional Bearish",
           tags: ["Bearish"],
           symbols: bseSwingBearishCount,
           image: "/images/stocks-bearish-daytrading.jpg",
