@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       async () => {
         const supabase = createClient();
         const { data, error } = await supabase
-          .from("swing_positional_bearish")
+          .from("nse_swing_positional_bearish")
           .select("*")
           .gte(
             "created_at",

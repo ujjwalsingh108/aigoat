@@ -30,6 +30,8 @@ export default function Screener() {
   const [bseBearishCount, setBseBearishCount] = useState(0);
   const [bseSwingBullishCount, setBseSwingBullishCount] = useState(0);
   const [bseSwingBearishCount, setBseSwingBearishCount] = useState(0);
+  const [nseSwingBullishCount, setNseSwingBullishCount] = useState(0);
+  const [nseSwingBearishCount, setNseSwingBearishCount] = useState(0);
 
   const supabase = createClient();
 
@@ -97,12 +99,34 @@ export default function Screener() {
           )
           .gte("probability", 0.3);
 
+        // Get NSE swing bullish count from last 15 minutes
+        const { count: nseSwingBullish } = await supabase
+          .from("nse_swing_positional_bullish")
+          .select("*", { count: "exact", head: true })
+          .gte(
+            "created_at",
+            new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          )
+          .gte("probability", 0.7);
+
+        // Get NSE swing bearish count from last 15 minutes
+        const { count: nseSwingBearish } = await supabase
+          .from("nse_swing_positional_bearish")
+          .select("*", { count: "exact", head: true })
+          .gte(
+            "created_at",
+            new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          )
+          .gte("probability", 0.7);
+
         setBullishCount(bullishTotal || 0);
         setBearishCount(bearishTotal || 0);
         setBseBullishCount(bseBullish || 0);
         setBseBearishCount(bseBearish || 0);
         setBseSwingBullishCount(bseSwingBullish || 0);
         setBseSwingBearishCount(bseSwingBearish || 0);
+        setNseSwingBullishCount(nseSwingBullish || 0);
+        setNseSwingBearishCount(nseSwingBearish || 0);
       } catch (error) {
         console.error("Error fetching counts:", error);
       }
@@ -191,13 +215,13 @@ export default function Screener() {
         {
           label: "Swing Positional Equity Bullish (1-15 days)",
           tags: ["Bullish"],
-          symbols: 0,
+          symbols: nseSwingBullishCount,
           image: "/images/stocks-bullish-month.jpg",
         },
         {
           label: "Swing Positional Equity Bearish (1-15 days)",
           tags: ["Bearish"],
-          symbols: 0,
+          symbols: nseSwingBearishCount,
           image: "/images/stocks-bearish-daytrading.jpg",
         },
       ],
