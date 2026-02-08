@@ -44,8 +44,8 @@ class DatabaseClient {
   async getEquitySymbols(exchange, limit = 1000) {
     return this.queryWithRetry(async () => {
       const tableName = exchange === 'NSE' 
-        ? 'kite_nse_equity_symbols' 
-        : 'kite_bse_equity_symbols';
+        ? 'nse_equity_top_1000_symbols' 
+        : 'bse_equity_top_1000_symbols';
       
       const { data, error } = await this.supabase
         .from(tableName)

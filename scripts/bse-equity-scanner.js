@@ -99,7 +99,7 @@ class BseEquityScanner {
               ai_risk_factors: JSON.stringify(aiResult.risk_factors),
               ai_validated: aiResult.ai_validated,
             };
-            await this.db.saveBullishSignal(enrichedSignal, 'breakout_signals');
+            await this.db.saveBullishSignal(enrichedSignal, 'bullish_breakout_bse_eq');
             bullishSignals++;
           }
         }
@@ -115,7 +115,7 @@ class BseEquityScanner {
               ai_risk_factors: JSON.stringify(aiResult.risk_factors),
               ai_validated: aiResult.ai_validated,
             };
-            await this.db.saveBearishSignal(enrichedSignal, 'intraday_bearish_signals');
+            await this.db.saveBearishSignal(enrichedSignal, 'bearish_breakout_bse_eq');
             bearishSignals++;
           }
         }

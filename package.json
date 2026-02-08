@@ -23,9 +23,13 @@
     "fetch-bse-symbols-from-spreadsheet": "tsx scripts/fetch-bse-symbols-from-spreadsheet.ts",
     "import-bse-symbols-from-spreadsheet": "tsx scripts/import-bse-symbols-from-spreadsheet.ts",
     "fetch-historical-all": "npm run fetch-historical-nse-equity && npm run fetch-historical-bse-equity && npm run fetch-historical-nse-fo && npm run fetch-historical-bse-fo",
+    "scanner:nse-equity": "node scripts/nse-equity-scanner.js",
+    "scanner:bse-equity": "node scripts/bse-equity-scanner.js",
     "scanner:nse-fo": "node scripts/nse-fo-scanner.js",
     "scanner:bse-fo": "node scripts/bse-fo-scanner.js",
-    "scanner:all-fo": "concurrently \"npm run scanner:nse-fo\" \"npm run scanner:bse-fo\""
+    "scanner:all-equity": "concurrently \"npm run scanner:nse-equity\" \"npm run scanner:bse-equity\"",
+    "scanner:all-fo": "concurrently \"npm run scanner:nse-fo\" \"npm run scanner:bse-fo\"",
+    "scanner:all": "concurrently \"npm run scanner:nse-equity\" \"npm run scanner:bse-equity\" \"npm run scanner:nse-fo\" \"npm run scanner:bse-fo\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

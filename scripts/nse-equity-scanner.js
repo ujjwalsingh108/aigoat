@@ -63,7 +63,7 @@ class NseEquityScanner {
       this.symbols = await this.db.getEquitySymbols('NSE', CONFIG.SYMBOLS_LIMIT);
       
       if (this.symbols.length === 0) {
-        throw new Error("No BSE symbols loaded");
+        throw new Error("No NSE symbols loaded");
       }
 
       console.log(`✅ Loaded ${this.symbols.length} NSE Equity symbols`);
@@ -101,7 +101,7 @@ class NseEquityScanner {
               ai_risk_factors: JSON.stringify(aiResult.risk_factors),
               ai_validated: aiResult.ai_validated,
             };
-            await this.db.saveBullishSignal(enrichedSignal, 'breakout_signals');
+            await this.db.saveBullishSignal(enrichedSignal, 'bullish_breakout_nse_eq');
             bullishSignals++;
           }
         }
@@ -118,7 +118,7 @@ class NseEquityScanner {
               ai_risk_factors: JSON.stringify(aiResult.risk_factors),
               ai_validated: aiResult.ai_validated,
             };
-            await this.db.saveBearishSignal(enrichedSignal, 'intraday_bearish_signals');
+            await this.db.saveBearishSignal(enrichedSignal, 'bearish_breakout_nse_eq');
             bearishSignals++;
           }
         }
