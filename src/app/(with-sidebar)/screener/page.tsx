@@ -35,26 +35,25 @@ export default function Screener() {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        // Get bullish count from last 15 minutes
+        // Get NSE bullish count from last 15 minutes
         const { count: bullishTotal } = await supabase
-          .from("breakout_signals")
+          .from("bullish_breakout_nse_eq")
           .select("*", { count: "exact", head: true })
           .gte(
             "created_at",
             new Date(Date.now() - 15 * 60 * 1000).toISOString()
           )
-          .eq("signal_type", "BULLISH_BREAKOUT")
           .gte("probability", 0.6);
 
-        // Get bearish count from last 15 minutes
+        // Get NSE bearish count from last 15 minutes
         const { count: bearishTotal } = await supabase
-          .from("intraday_bearish_signals")
+          .from("bearish_breakout_nse_eq")
           .select("*", { count: "exact", head: true })
           .gte(
             "created_at",
             new Date(Date.now() - 15 * 60 * 1000).toISOString()
           )
-          .gte("probability", 0.6);
+          .gte("probability", 0.3);
 
         setBullishCount(bullishTotal || 0);
         setBearishCount(bearishTotal || 0);
