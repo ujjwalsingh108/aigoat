@@ -50,23 +50,27 @@ export function ScreenerCard({
   const handleClick = () => {
     // Route to specific strategy pages based on label
     if (label === "NSE Bullish Breakout") {
-      router.push(`/screener/intraday-bullish`);
+      router.push(`/screener/nse-bullish`);
     } else if (label === "NSE Bearish Breakdown") {
-      router.push(`/screener/intraday-bearish`);
+      router.push(`/screener/nse-bearish`);
     } else if (label === "Intraday Equity Bullish") {
-      router.push(`/screener/intraday-bullish`);
+      router.push(`/screener/nse-bullish`);
     } else if (label === "Intraday Equity Bearish") {
-      router.push(`/screener/intraday-bearish`);
+      router.push(`/screener/nse-bearish`);
     } else if (label === "Swing Positional Equity Bullish (1-15 days)") {
-      router.push(`/screener/swing-positional-bullish`);
+      router.push(`/screener/nse-swing-bullish`);
     } else if (label === "Swing Positional Equity Bearish (1-15 days)") {
-      router.push(`/screener/swing-positional-bearish`);
+      router.push(`/screener/nse-swing-bearish`);
     } else if (label === "NIFTY & BANKNIFTY F&O") {
       router.push(`/screener/nse-fo`);
     } else if (label === "BSE Bullish Breakout") {
       router.push(`/screener/bse-bullish`);
     } else if (label === "BSE Bearish Breakdown") {
       router.push(`/screener/bse-bearish`);
+    } else if (label === "BSE Swing Positional Bullish (1-15 days)") {
+      router.push(`/screener/bse-swing-bullish`);
+    } else if (label === "BSE Swing Positional Bearish (1-15 days)") {
+      router.push(`/screener/bse-swing-bearish`);
     } else if (label === "BSE F&O") {
       router.push(`/screener/bse-fo`);
     } else if (label === "Intraday Index (NIFTY / BANKNIFTY)") {

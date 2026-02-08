@@ -28,6 +28,8 @@ export default function Screener() {
   const [bseFoCount, setBseFoCount] = useState(0);
   const [bseBullishCount, setBseBullishCount] = useState(0);
   const [bseBearishCount, setBseBearishCount] = useState(0);
+  const [bseSwingBullishCount, setBseSwingBullishCount] = useState(0);
+  const [bseSwingBearishCount, setBseSwingBearishCount] = useState(0);
 
   const supabase = createClient();
 
@@ -75,10 +77,32 @@ export default function Screener() {
           )
           .gte("probability", 0.3);
 
+        // Get BSE swing bullish count from last 15 minutes
+        const { count: bseSwingBullish } = await supabase
+          .from("bullish_swing_bse_eq")
+          .select("*", { count: "exact", head: true })
+          .gte(
+            "created_at",
+            new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          )
+          .gte("probability", 0.6);
+
+        // Get BSE swing bearish count from last 15 minutes
+        const { count: bseSwingBearish } = await supabase
+          .from("bearish_swing_bse_eq")
+          .select("*", { count: "exact", head: true })
+          .gte(
+            "created_at",
+            new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          )
+          .gte("probability", 0.3);
+
         setBullishCount(bullishTotal || 0);
         setBearishCount(bearishTotal || 0);
         setBseBullishCount(bseBullish || 0);
         setBseBearishCount(bseBearish || 0);
+        setBseSwingBullishCount(bseSwingBullish || 0);
+        setBseSwingBearishCount(bseSwingBearish || 0);
       } catch (error) {
         console.error("Error fetching counts:", error);
       }
@@ -174,6 +198,23 @@ export default function Screener() {
           label: "Swing Positional Equity Bearish (1-15 days)",
           tags: ["Bearish"],
           symbols: 0,
+          image: "/images/stocks-bearish-daytrading.jpg",
+        },
+      ],
+    },
+    {
+      title: "Swing Positional (BSE)",
+      items: [
+        {
+          label: "BSE Swing Positional Bullish (1-15 days)",
+          tags: ["Bullish"],
+          symbols: bseSwingBullishCount,
+          image: "/images/stocks-bullish-month.jpg",
+        },
+        {
+          label: "BSE Swing Positional Bearish (1-15 days)",
+          tags: ["Bearish"],
+          symbols: bseSwingBearishCount,
           image: "/images/stocks-bearish-daytrading.jpg",
         },
       ],
