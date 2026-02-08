@@ -55,8 +55,30 @@ export default function Screener() {
           )
           .gte("probability", 0.3);
 
+        // Get BSE bullish count from last 15 minutes
+        const { count: bseBullish } = await supabase
+          .from("bullish_breakout_bse_eq")
+          .select("*", { count: "exact", head: true })
+          .gte(
+            "created_at",
+            new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          )
+          .gte("probability", 0.6);
+
+        // Get BSE bearish count from last 15 minutes
+        const { count: bseBearish } = await supabase
+          .from("bearish_breakout_bse_eq")
+          .select("*", { count: "exact", head: true })
+          .gte(
+            "created_at",
+            new Date(Date.now() - 15 * 60 * 1000).toISOString()
+          )
+          .gte("probability", 0.3);
+
         setBullishCount(bullishTotal || 0);
         setBearishCount(bearishTotal || 0);
+        setBseBullishCount(bseBullish || 0);
+        setBseBearishCount(bseBearish || 0);
       } catch (error) {
         console.error("Error fetching counts:", error);
       }
@@ -84,12 +106,6 @@ export default function Screener() {
           const finniftyCount = nseFoData.data.grouped.FINNIFTY?.length || 0;
           setNseFoCount(niftyCount + bankniftyCount + finniftyCount);
         }
-
-        // Fetch BSE Equity count for BSE bullish/bearish cards
-        const bseEquityResponse = await fetch("/api/symbols/bse-equity?limit=1000");
-        const bseEquityData = await bseEquityResponse.json();
-        setBseBullishCount(bseEquityData.count || 0);
-        setBseBearishCount(bseEquityData.count || 0);
 
         // Fetch BSE F&O signals (SENSEX + BANKEX combined)
         const bseFoResponse = await fetch("/api/signals/bse-fo");
