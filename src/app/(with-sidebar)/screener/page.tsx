@@ -129,23 +129,6 @@ export default function Screener() {
       ],
     },
     {
-      title: "Swing Positional (NSE)",
-      items: [
-        {
-          label: "Swing Positional Equity Bullish (1-15 days)",
-          tags: ["Bullish"],
-          symbols: 0,
-          image: "/images/stocks-bullish-month.jpg",
-        },
-        {
-          label: "Swing Positional Equity Bearish (1-15 days)",
-          tags: ["Bearish"],
-          symbols: 0,
-          image: "/images/stocks-bearish-daytrading.jpg",
-        },
-      ],
-    },
-    {
       title: "BSE Stocks (EQ)",
       items: [
         {
@@ -158,6 +141,23 @@ export default function Screener() {
           label: "BSE Bearish Breakdown",
           tags: ["Bearish"],
           symbols: bseBearishCount,
+          image: "/images/stocks-bearish-daytrading.jpg",
+        },
+      ],
+    },
+    {
+      title: "Swing Positional (NSE)",
+      items: [
+        {
+          label: "Swing Positional Equity Bullish (1-15 days)",
+          tags: ["Bullish"],
+          symbols: 0,
+          image: "/images/stocks-bullish-month.jpg",
+        },
+        {
+          label: "Swing Positional Equity Bearish (1-15 days)",
+          tags: ["Bearish"],
+          symbols: 0,
           image: "/images/stocks-bearish-daytrading.jpg",
         },
       ],
