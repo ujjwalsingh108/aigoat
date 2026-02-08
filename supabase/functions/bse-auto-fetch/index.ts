@@ -52,12 +52,12 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-// Get all NSE equity symbols from nse_bse_equity_top_1000_symbols table
+// Get all BSE equity symbols from bse_equity_top_1000_symbols table
 async function getSymbolsFromDB(): Promise<
   Array<{ symbol: string; instrument_token: string }>
 > {
   const { data, error } = await supabase
-    .from("nse_bse_equity_top_1000_symbols")
+    .from("bse_equity_top_1000_symbols")
     .select("symbol, instrument_token")
     .eq("is_active", true)
     .order("symbol", { ascending: true });
@@ -66,11 +66,11 @@ async function getSymbolsFromDB(): Promise<
 
   if (!data || data.length === 0) {
     throw new Error(
-      "No symbols found in nse_bse_equity_top_1000_symbols table."
+      "No symbols found in bse_equity_top_1000_symbols table."
     );
   }
 
-  console.log(`✅ Loaded ${data.length} NSE equity symbols from database`);
+  console.log(`✅ Loaded ${data.length} BSE equity symbols from database`);
   return data || [];
 }
 
@@ -141,7 +141,7 @@ async function fetchSymbolData(
 
   if (dataToInsert.length > 0) {
     const { error } = await supabase
-      .from("historical_prices_nse_equity")
+      .from("historical_prices_bse_equity")
       .upsert(dataToInsert, {
         onConflict: "symbol,date,time",
         ignoreDuplicates: false,
@@ -177,10 +177,10 @@ async function processAllSymbols() {
     const fromDateStr = fromDate.toISOString().split("T")[0];
     const toDateStr = toDate.toISOString().split("T")[0];
 
-    // Get all symbols from nse_bse_equity_top_1000_symbols table
+    // Get all symbols from bse_equity_top_1000_symbols table
     let symbols = await getSymbolsFromDB();
 
-    console.log(`📊 Processing ${symbols.length} NSE equity symbols...`);
+    console.log(`📊 Processing ${symbols.length} BSE equity symbols...`);
 
     // Process symbols in batches to avoid overwhelming the API
     const batchSize = 5;
@@ -273,8 +273,8 @@ async function logExecution(result: any) {
         totalSymbols: result.totalSymbols,
         interval: "5min",
         provider: "zerodha_kite",
-        sourceTable: "nse_bse_equity_top_1000_symbols",
-        destinationTable: "historical_prices_nse_equity",
+        sourceTable: "bse_equity_top_1000_symbols",
+        destinationTable: "historical_prices_bse_equity",
       },
     });
   } catch (error) {
@@ -350,7 +350,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: result.success,
-        message: `Auto-fetch completed for ${result.totalSymbols} NSE equity stocks`,
+        message: `Auto-fetch completed for ${result.totalSymbols} BSE equity stocks`,
         summary: {
           timestamp: new Date().toLocaleString("en-US", {
             timeZone: "Asia/Kolkata",
@@ -381,6 +381,7 @@ Deno.serve(async (req) => {
       totalRecords: 0,
       failedSymbols: 0,
       duration: 0,
+      totalSymbols: 0,
       errors: [error instanceof Error ? error.message : String(error)],
     });
 
