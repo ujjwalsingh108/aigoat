@@ -12,7 +12,8 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("nse_fo_signals")
       .select("*")
-      .order("last_scanned_at", { ascending: false })
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
       .limit(100);
 
     if (error) {

@@ -60,6 +60,107 @@ class DatabaseClient {
   }
 
   /**
+   * Get NSE F&O symbols (NIFTY only, active PE/CE near ATM)
+   */
+  async getNseFoSymbols(underlying = 'NIFTY', limit = 50) {
+    return this.queryWithRetry(async () => {
+      const { data, error } = await this.supabase
+        .from('nse_fo_symbols')
+        .select("symbol, instrument_token, exchange, segment, underlying, instrument_type, expiry, strike, option_type")
+        .eq("is_active", true)
+        .eq("underlying", underlying)
+        .in("option_type", ["CE", "PE"])
+        .gte("expiry", new Date().toISOString().split('T')[0]) // Active contracts only
+        .order("expiry", { ascending: true })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    });
+  }
+
+  /**
+   * Get NSE F&O historical data
+   */
+  async getNseFoHistoricalData(symbol, limit = 50) {
+    return this.queryWithRetry(async () => {
+      const { data, error } = await this.supabase
+        .from('historical_prices_nse_fo')
+        .select("date, time, timestamp, open, high, low, close, volume, open_interest")
+        .eq("symbol", symbol)
+        .order("timestamp", { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data ? data.reverse() : [];
+    });
+  }
+
+  /**
+   * Save NSE F&O signal
+   */
+  async saveNseFoSignal(signal) {
+    return this.queryWithRetry(async () => {
+      const { error } = await this.supabase
+        .from('nse_fo_signals')
+        .insert({
+          symbol: signal.symbol,
+          instrument_token: signal.instrument_token,
+          underlying: signal.underlying,
+          instrument_type: signal.instrument_type,
+          expiry: signal.expiry,
+          strike: signal.strike,
+          option_type: signal.option_type,
+          signal_type: signal.signal_type,
+          entry_price: signal.entry_price,
+          ema20_5min: signal.ema20_5min,
+          rsi14_5min: signal.rsi14_5min,
+          volume: signal.volume,
+          avg_volume: signal.avg_volume,
+          candle_time: signal.candle_time,
+          target1: signal.target1,
+          target2: signal.target2,
+          stop_loss: signal.stop_loss,
+          probability: signal.probability,
+          criteria_met: signal.criteria_met,
+          is_active: signal.is_active,
+          created_at: signal.created_at,
+        });
+
+      if (error) {
+        // If it's a duplicate key error, update the existing record
+        if (error.code === '23505') {
+          const { error: updateError } = await this.supabase
+            .from('nse_fo_signals')
+            .update({
+              signal_type: signal.signal_type,
+              entry_price: signal.entry_price,
+              ema20_5min: signal.ema20_5min,
+              rsi14_5min: signal.rsi14_5min,
+              volume: signal.volume,
+              avg_volume: signal.avg_volume,
+              candle_time: signal.candle_time,
+              target1: signal.target1,
+              target2: signal.target2,
+              stop_loss: signal.stop_loss,
+              probability: signal.probability,
+              criteria_met: signal.criteria_met,
+              is_active: signal.is_active,
+              created_at: signal.created_at,
+            })
+            .eq('symbol', signal.symbol)
+            .eq('instrument_token', signal.instrument_token);
+
+          if (updateError) throw updateError;
+        } else {
+          throw error;
+        }
+      }
+      return true;
+    });
+  }
+
+  /**
    * Get F&O symbols with filters
    */
   async getFoSymbols(exchange, underlyings, limit = 1000) {

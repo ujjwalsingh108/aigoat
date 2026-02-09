@@ -1,339 +1,78 @@
 require("dotenv").config();
-const { createClient } = require("@supabase/supabase-js");
+const { DatabaseClient } = require("./utils/database-client");
+const { TechnicalIndicators } = require("./utils/indicators");
+const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
 const { PatternDetector } = require("./pattern-detector");
 const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
+const cache = require("./memory-cache");
 
 // =================================================================
 // 🔧 CONFIGURATION
 // =================================================================
 
 const CONFIG = {
-  // Supabase connection
+  // Database
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  MAX_DB_RETRIES: 3,
+  DB_RETRY_DELAY: 2000,
 
   // Scanner settings
-  CANDLE_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
+  SCAN_INTERVAL_MS: parseInt(process.env.SCAN_INTERVAL_MS) || 60000, // 60 seconds
+  SYMBOLS_LIMIT: 50, // Top 50 most liquid NIFTY options (ATM ±5 strikes)
   
-  // Trading hours (IST)
-  MARKET_OPEN_HOUR: 9,
-  MARKET_OPEN_MINUTE: 15,
-  MARKET_CLOSE_HOUR: 15,
-  MARKET_CLOSE_MINUTE: 30,
-
-  // Technical analysis
+  // Technical analysis (5-min timeframe for F&O)
   EMA_PERIOD: 20,
+  RSI_PERIOD: 14,
   MIN_CANDLES_FOR_ANALYSIS: 20,
-
+  
   // F&O specific filters
-  FOCUS_UNDERLYINGS: ["NIFTY", "BANKNIFTY", "FINNIFTY"],
-  MIN_OI_THRESHOLD: 100000, // Minimum Open Interest
-  MAX_STRIKES_FROM_ATM: 2, // ATM ± 2 strikes
-  NEAR_MONTH_EXPIRY_ONLY: true,
+  FOCUS_UNDERLYINGS: ["NIFTY"], // Start with NIFTY only
   
-  // IV filters (percentile-based)
-  MAX_IV_PERCENTILE_FOR_BUY: 30, // Buy options when IV < 30th percentile
+  // Signal generation (more aggressive for F&O)
+  MIN_CONFIDENCE_TO_SAVE: 0.7, // Higher threshold for options
+  MIN_CRITERIA_MET: 4,
   
-  // Signal generation
-  DISTANCE_FROM_SWING_LIMIT: 150, // Max 150 points from swing
-  TARGET1_POINTS: 50,
-  TARGET2_POINTS: 75,
-  
-  // Performance
-  SCAN_INTERVAL_MS: 60000, // Scan every 60 seconds
+  // Cleanup
+  SIGNAL_TTL_MINUTES: 15, // F&O signals expire in 15 minutes
+  CLEANUP_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
 };
 
-// =================================================================
-// 📊 DATABASE CLIENT
-// =================================================================
-
-class FoDatabaseClient {
-  constructor() {
-    this.supabase = createClient(
-      CONFIG.SUPABASE_URL,
-      CONFIG.SUPABASE_SERVICE_KEY
-    );
-  }
-
-  async getNseFoInstruments() {
-    try {
-      console.log("📊 Fetching NSE F&O instruments...");
-
-      // Get futures + options for NIFTY, BANKNIFTY, FINNIFTY
-      const { data, error } = await this.supabase
-        .from("kite_nse_fo_symbols")
-        .select("symbol, instrument_token, underlying, instrument_type, expiry, strike, option_type")
-        .eq("is_active", true)
-        .in("underlying", CONFIG.FOCUS_UNDERLYINGS)
-        .order("expiry", { ascending: true });
-
-      if (error) throw error;
-
-      console.log(`✅ Loaded ${data.length} NSE F&O instruments`);
-      
-      // Filter for near-month expiries
-      const filtered = this.filterNearMonthExpiries(data);
-      console.log(`✅ After expiry filter: ${filtered.length} instruments`);
-      
-      return filtered;
-    } catch (error) {
-      console.error("❌ Error fetching NSE F&O instruments:", error);
-      return [];
-    }
-  }
-
-  filterNearMonthExpiries(instruments) {
-    const today = new Date();
-    const grouped = {};
-
-    // Group by underlying
-    instruments.forEach(inst => {
-      if (!grouped[inst.underlying]) {
-        grouped[inst.underlying] = [];
-      }
-      grouped[inst.underlying].push(inst);
-    });
-
-    const result = [];
-
-    // For each underlying, keep only next 2 expiries
-    Object.entries(grouped).forEach(([underlying, instList]) => {
-      const expiries = [...new Set(instList.map(i => i.expiry))];
-      const nearExpiries = expiries
-        .filter(exp => new Date(exp) >= today)
-        .slice(0, 2); // Current week + next week
-
-      instList.forEach(inst => {
-        if (nearExpiries.includes(inst.expiry)) {
-          result.push(inst);
-        }
-      });
-    });
-
-    return result;
-  }
-
-  async getHistoricalData(symbol, limit = 50) {
-    try {
-      const { data, error } = await this.supabase
-        .from("historical_prices_nse_fo")
-        .select("date, time, timestamp, open, high, low, close, volume")
-        .eq("symbol", symbol)
-        .order("timestamp", { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      
-      return data ? data.reverse() : [];
-    } catch (error) {
-      console.error(`❌ Error fetching historical data for ${symbol}:`, error.message);
-      return [];
-    }
-  }
-
-  async saveNseFoSignal(signal) {
-    try {
-      const { error } = await this.supabase
-        .from("nse_fo_signals")
-        .upsert(
-          {
-            symbol: signal.symbol,
-            underlying: signal.underlying,
-            instrument_type: signal.instrument_type,
-            strike: signal.strike,
-            option_type: signal.option_type,
-            signal_type: signal.signal_type,
-            signal_direction: signal.signal_direction,
-            entry_price: signal.entry_price,
-            target1: signal.target1,
-            target2: signal.target2,
-            stop_loss: signal.stop_loss,
-            ema20_5min: signal.ema20_5min,
-            swing_reference_price: signal.swing_reference_price,
-            distance_from_swing: signal.distance_from_swing,
-            open_interest: signal.open_interest,
-            oi_change: signal.oi_change,
-            implied_volatility: signal.implied_volatility,
-            confidence_score: signal.confidence_score,
-            created_by: "nse_fo_scanner",
-            last_scanned_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "symbol",
-            ignoreDuplicates: false,
-          }
-        );
-
-      if (error) {
-        console.error(`❌ Error saving NSE F&O signal for ${signal.symbol}:`, error.message);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error(`❌ Error saving NSE F&O signal:`, error.message);
-      return false;
-    }
-  }
-}
 
 // =================================================================
-// 📈 TECHNICAL ANALYSIS
-// =================================================================
-
-class TechnicalAnalyzer {
-  calculateEMA(prices, period) {
-    if (!prices || prices.length < period) return null;
-
-    const multiplier = 2 / (period + 1);
-    let ema = prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
-
-    for (let i = period; i < prices.length; i++) {
-      ema = (prices[i] - ema) * multiplier + ema;
-    }
-
-    return ema;
-  }
-
-  findRecentSwingLow(candles, lookback = 10) {
-    if (!candles || candles.length < lookback) return null;
-    
-    const recentCandles = candles.slice(-lookback);
-    const lows = recentCandles.map(c => parseFloat(c.low));
-    return Math.min(...lows);
-  }
-
-  findRecentSwingHigh(candles, lookback = 10) {
-    if (!candles || candles.length < lookback) return null;
-    
-    const recentCandles = candles.slice(-lookback);
-    const highs = recentCandles.map(c => parseFloat(c.high));
-    return Math.max(...highs);
-  }
-
-  detectPatterns(candles) {
-    try {
-      if (!candles || candles.length < 10) return null;
-      
-      // Convert to format expected by PatternDetector
-      const formattedCandles = candles.map(c => ({
-        open: parseFloat(c.open),
-        high: parseFloat(c.high),
-        low: parseFloat(c.low),
-        close: parseFloat(c.close),
-        volume: parseInt(c.volume || 0)
-      }));
-      
-      return this.patternDetector.detectAllPatterns(formattedCandles);
-    } catch (error) {
-      return null;
-    }
-  }
-
-  analyzeIntradayIndex(underlying, historicalCandles, currentPrice) {
-    if (!currentPrice || !historicalCandles || historicalCandles.length < CONFIG.EMA_PERIOD) {
-      return null;
-    }
-
-    const prices = historicalCandles.map(c => parseFloat(c.close));
-    prices.push(currentPrice);
-
-    const ema20 = this.calculateEMA(prices, CONFIG.EMA_PERIOD);
-    if (!ema20) return null;
-
-    const swingLow = this.findRecentSwingLow(historicalCandles, 10);
-    const swingHigh = this.findRecentSwingHigh(historicalCandles, 10);
-
-    let signal = null;
-
-    // Detect chart patterns
-    const patterns = this.detectPatterns(historicalCandles);
-    const hasConfirmingPattern = patterns && patterns.strongest && 
-      ((currentPrice > ema20 && patterns.strongest.type.includes('bullish')) ||
-       (currentPrice < ema20 && patterns.strongest.type.includes('bearish')));
-
-    // LONG SIGNAL: Price > EMA20 AND within 150 points of swing low
-    if (currentPrice > ema20 && swingLow) {
-      const distanceFromSwingLow = currentPrice - swingLow;
-      
-      if (distanceFromSwingLow <= CONFIG.DISTANCE_FROM_SWING_LIMIT) {
-        signal = {
-          underlying,
-          signal_type: 'FO_LONG',
-          signal_direction: 'LONG',
-          index_price: currentPrice,
-          ema20_5min: parseFloat(ema20.toFixed(2)),
-          swing_reference_price: parseFloat(swingLow.toFixed(2)),
-          distance_from_swing: parseFloat(distanceFromSwingLow.toFixed(2)),
-          target1_index: parseFloat((currentPrice + CONFIG.TARGET1_POINTS).toFixed(2)),
-          target2_index: parseFloat((currentPrice + CONFIG.TARGET2_POINTS).toFixed(2)),
-          stop_loss_index: parseFloat(swingLow.toFixed(2)),
-          pattern: patterns?.strongest?.name || null,
-          pattern_confidence: patterns?.strongest?.confidence || null,
-          has_confirming_pattern: hasConfirmingPattern,
-        };
-      }
-    }
-    // SHORT SIGNAL: Price < EMA20 AND within 150 points of swing high
-    else if (currentPrice < ema20 && swingHigh) {
-      const distanceFromSwingHigh = swingHigh - currentPrice;
-      
-      if (distanceFromSwingHigh <= CONFIG.DISTANCE_FROM_SWING_LIMIT) {
-        signal = {
-          underlying,
-          signal_type: 'FO_SHORT',
-          signal_direction: 'SHORT',
-          index_price: currentPrice,
-          ema20_5min: parseFloat(ema20.toFixed(2)),
-          swing_reference_price: parseFloat(swingHigh.toFixed(2)),
-          distance_from_swing: parseFloat(distanceFromSwingHigh.toFixed(2)),
-          target1_index: parseFloat((currentPrice - CONFIG.TARGET1_POINTS).toFixed(2)),
-          target2_index: parseFloat((currentPrice - CONFIG.TARGET2_POINTS).toFixed(2)),
-          stop_loss_index: parseFloat(swingHigh.toFixed(2)),
-          pattern: patterns?.strongest?.name || null,
-          pattern_confidence: patterns?.strongest?.confidence || null,
-          has_confirming_pattern: hasConfirmingPattern,
-        };
-      }
-    }
-
-    return signal;
-  }
-}
-
-// =================================================================
-// 🎯 F&O SCANNER
+// 📊 NSE F&O SCANNER (BATCH MODE)
 // =================================================================
 
 class NseFoScanner {
   constructor() {
-    this.db = new FoDatabaseClient();
-    this.analyzer = new TechnicalAnalyzer();
+    this.db = new DatabaseClient(CONFIG);
+    this.monitor = new ScannerMonitor('NSE_FO');
     this.patternDetector = new PatternDetector();
     this.aiFilter = new AiBreakoutFilter();
-    this.kite = null;
-    this.instruments = [];
-    this.underlyingPrices = new Map(); // Track NIFTY, BANKNIFTY, FINNIFTY prices
+    this.symbols = [];
     this.scanInterval = null;
+    this.cleanupInterval = null;
   }
 
   async initialize() {
-    console.log("🚀 Initializing NSE F&O Scanner...");
+    console.log("🚀 Initializing NSE F&O Scanner (Batch Mode)...");
     console.log(`📊 Configuration:
-      - Underlyings: ${CONFIG.FOCUS_UNDERLYINGS.join(", ")}
-      - Min OI: ${CONFIG.MIN_OI_THRESHOLD.toLocaleString()}
-      - Strike Range: ATM ± ${CONFIG.MAX_STRIKES_FROM_ATM}
       - Scan Interval: ${CONFIG.SCAN_INTERVAL_MS / 1000}s
+      - Symbols Limit: ${CONFIG.SYMBOLS_LIMIT}
+      - Min Confidence: ${CONFIG.MIN_CONFIDENCE_TO_SAVE}
     `);
 
     try {
-      this.instruments = await this.db.getNseFoInstruments();
-
-      if (this.instruments.length === 0) {
-        throw new Error("No NSE F&O instruments loaded");
+      // Get active NIFTY PE/CE options near ATM
+      this.symbols = await this.db.getNseFoSymbols('NIFTY', CONFIG.SYMBOLS_LIMIT);
+      
+      if (this.symbols.length === 0) {
+        throw new Error("No NSE F&O symbols loaded");
       }
 
-      console.log(`✅ Scanner initialized with ${this.instruments.length} F&O instruments`);
+      console.log(`✅ Loaded ${this.symbols.length} NSE F&O symbols`);
+      console.log(`📊 Sample: ${this.symbols.slice(0, 5).map(s => s.symbol).join(', ')}`);
+      
       return true;
     } catch (error) {
       console.error("❌ Initialization failed:", error);
@@ -341,204 +80,231 @@ class NseFoScanner {
     }
   }
 
-  async getUnderlyingPrice(underlying) {
-    try {
-      // Get latest candle from historical data
-      const historical = await this.db.getHistoricalData(underlying, 1);
-      
-      if (historical.length === 0) return null;
-      
-      return parseFloat(historical[0].close);
-    } catch (error) {
-      console.error(`❌ Error fetching ${underlying} price:`, error.message);
-      return null;
-    }
-  }
+  async scanAllSymbols() {
+    const startTime = Date.now();
+    let totalSignals = 0;
 
-  findATMStrike(price, strikeInterval = 50) {
-    // Round to nearest strike
-    return Math.round(price / strikeInterval) * strikeInterval;
-  }
+    console.log(`\n🔍 Starting NSE F&O scan at ${new Date().toLocaleTimeString()}...`);
 
-  async selectBestOption(underlying, signalDirection, indexPrice) {
-    // Find ATM strike
-    const atmStrike = this.findATMStrike(indexPrice, underlying === 'BANKNIFTY' ? 100 : 50);
-    
-    // Determine option type
-    const optionType = signalDirection === 'LONG' ? 'CE' : 'PE';
-    
-    // Get strikes within range (ATM ± MAX_STRIKES_FROM_ATM)
-    const strikeInterval = underlying === 'BANKNIFTY' ? 100 : 50;
-    const minStrike = atmStrike - (CONFIG.MAX_STRIKES_FROM_ATM * strikeInterval);
-    const maxStrike = atmStrike + (CONFIG.MAX_STRIKES_FROM_ATM * strikeInterval);
-
-    // Filter instruments
-    const candidates = this.instruments.filter(inst => 
-      inst.underlying === underlying &&
-      inst.instrument_type === 'OPT' &&
-      inst.option_type === optionType &&
-      inst.strike >= minStrike &&
-      inst.strike <= maxStrike
-    );
-
-    if (candidates.length === 0) return null;
-
-    // Get latest data for all candidates from historical database
-    try {
-      // Select strike with highest OI that meets threshold
-      let bestOption = null;
-      let highestOI = 0;
-
-      for (const candidate of candidates) {
-        // Get latest historical data for this option
-        const optionHistory = await this.db.getHistoricalData(candidate.symbol, 1);
-        
-        if (optionHistory.length === 0) continue;
-
-        const latestCandle = optionHistory[0];
-        const oi = parseInt(latestCandle.oi || 0);
-        const volume = parseInt(latestCandle.volume || 0);
-
-        if (oi >= CONFIG.MIN_OI_THRESHOLD && oi > highestOI) {
-          highestOI = oi;
-          bestOption = {
-            ...candidate,
-            entry_price: parseFloat(latestCandle.close),
-            open_interest: oi,
-            oi_change: volume, // Use volume as proxy for OI change
-            implied_volatility: 0, // Set to 0 or calculate if IV data available
-            bid: parseFloat(latestCandle.close) * 0.995, // Approximate bid
-            ask: parseFloat(latestCandle.close) * 1.005, // Approximate ask
-          };
-        }
-      }
-
-      return bestOption;
-    } catch (error) {
-      console.error(`❌ Error fetching option quotes for ${underlying}:`, error.message);
-      return null;
-    }
-  }
-
-  async scanForSignals() {
-    console.log(`\n🔍 Scanning NSE F&O at ${new Date().toLocaleTimeString()}...`);
-
-    const signals = [];
-
-    for (const underlying of CONFIG.FOCUS_UNDERLYINGS) {
+    for (const symbolData of this.symbols) {
       try {
-        // Get current index price
-        const indexPrice = await this.getUnderlyingPrice(underlying);
-        if (!indexPrice) {
-          console.log(`⚠️ Could not fetch ${underlying} price`);
-          continue;
-        }
-
-        console.log(`📊 ${underlying}: ${indexPrice.toFixed(2)}`);
-
-        // Get historical data for the underlying futures
-        const futuresSymbol = `${underlying}26FEBFUT`; // Adjust month dynamically in production
-        const historicalData = await this.db.getHistoricalData(futuresSymbol, 50);
-
-        if (historicalData.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
-          console.log(`⚠️ Insufficient historical data for ${underlying}`);
-          continue;
-        }
-
-        // Analyze index for signal
-        const indexSignal = this.analyzer.analyzeIntradayIndex(
-          underlying,
-          historicalData,
-          indexPrice
-        );
-
-        if (!indexSignal) {
-          console.log(`   No signal for ${underlying}`);
-          continue;
-        }
-
-        console.log(`   ✅ ${indexSignal.signal_direction} signal for ${underlying}`);
-
-        // Find best option contract
-        const bestOption = await this.selectBestOption(
-          underlying,
-          indexSignal.signal_direction,
-          indexPrice
-        );
-
-        if (!bestOption) {
-          console.log(`   ⚠️ No suitable option found for ${underlying}`);
-          continue;
-        }
-
-        // Calculate option targets (premium-based)
-        const entryPremium = bestOption.entry_price;
-        const target1Premium = entryPremium * 1.20; // +20%
-        const target2Premium = entryPremium * 1.30; // +30%
-        const stopLossPremium = entryPremium * 0.85; // -15%
-
-        const signal = {
-          symbol: bestOption.symbol,
-          underlying: bestOption.underlying,
-          instrument_type: bestOption.instrument_type,
-          strike: bestOption.strike,
-          option_type: bestOption.option_type,
-          signal_type: indexSignal.signal_type,
-          signal_direction: indexSignal.signal_direction,
-          entry_price: parseFloat(entryPremium.toFixed(2)),
-          target1: parseFloat(target1Premium.toFixed(2)),
-          target2: parseFloat(target2Premium.toFixed(2)),
-          stop_loss: parseFloat(stopLossPremium.toFixed(2)),
-          ema20_5min: indexSignal.ema20_5min,
-          swing_reference_price: indexSignal.swing_reference_price,
-          distance_from_swing: indexSignal.distance_from_swing,
-          open_interest: bestOption.open_interest,
-          oi_change: bestOption.oi_change,
-          implied_volatility: parseFloat(bestOption.implied_volatility.toFixed(2)),
-          confidence_score: 0.75, // Base confidence for F&O signals
-          pattern: indexSignal.pattern,
-          pattern_confidence: indexSignal.pattern_confidence,
-          has_confirming_pattern: indexSignal.has_confirming_pattern,
-        };
-
-        // AI validation
-        const aiResult = await this.aiFilter.validateBreakout(signal, { 
-          patterns: indexSignal.pattern ? { strongest: { name: indexSignal.pattern, confidence: indexSignal.pattern_confidence } } : null,
-          historicalCandles: historicalData 
-        });
+        const signal = await this.analyzeSymbol(symbolData);
         
-        if (this.aiFilter.shouldSaveSignal(aiResult, 0.7)) { // Higher threshold for F&O (70%)
-          // Merge AI result
-          const enrichedSignal = {
-            ...signal,
-            ai_verdict: aiResult.verdict,
-            ai_confidence: aiResult.confidence,
-            ai_reasoning: aiResult.reasoning,
-            ai_risk_factors: JSON.stringify(aiResult.risk_factors),
-            ai_validated: aiResult.ai_validated,
-          };
-
-          signals.push(enrichedSignal);
+        if (signal) {
+          // AI validation for F&O signals
+          const aiResult = await this.aiFilter.validateBreakout(signal.data, { 
+            patterns: signal.patterns, 
+            historicalCandles: signal.historical 
+          });
           
-          console.log(`   💾 Signal: ${signal.symbol} @ ₹${signal.entry_price} (AI: ${aiResult.verdict}) (OI: ${signal.open_interest.toLocaleString()})`);
-
-          // Save to database
-          await this.db.saveNseFoSignal(enrichedSignal);
-        } else {
-          console.log(`   ❌ Rejected by AI: ${signal.symbol} (${aiResult.verdict})`);
+          if (this.aiFilter.shouldSaveSignal(aiResult, CONFIG.MIN_CONFIDENCE_TO_SAVE)) {
+            const enrichedSignal = {
+              ...signal.data,
+              ai_verdict: aiResult.verdict,
+              ai_confidence: aiResult.confidence,
+              ai_reasoning: aiResult.reasoning,
+              ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+            };
+            
+            await this.db.saveNseFoSignal(enrichedSignal);
+            totalSignals++;
+          }
         }
-
       } catch (error) {
-        console.error(`❌ Error scanning ${underlying}:`, error.message);
+        if (error.message && !error.message.includes('rate limit')) {
+          console.error(`⚠️ Error analyzing ${symbolData.symbol}:`, error.message);
+        }
       }
     }
 
-    console.log(`\n✅ Scan complete. Generated ${signals.length} signals.`);
-    return signals;
+    const duration = Date.now() - startTime;
+    
+    this.monitor.recordScan(duration, totalSignals);
+    console.log(`✅ Scan complete: ${totalSignals} signals | ${duration}ms`);
+  }
+
+  async analyzeSymbol(symbolData) {
+    const symbol = symbolData.symbol;
+
+    // Fetch 5-min historical data with cache
+    const historicalCacheKey = `nse_fo_hist_${symbol}_50`;
+    let historical = cache.get(historicalCacheKey);
+    
+    if (!historical) {
+      historical = await this.db.getNseFoHistoricalData(symbol, 50);
+      // Cache for 5 minutes (gets fresh data every few scans)
+      cache.set(historicalCacheKey, historical, 300);
+    }
+
+    if (historical.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
+      return null;
+    }
+
+    // Get current candle (last 5-min candle)
+    const currentCandle = historical[historical.length - 1];
+    const currentPrice = parseFloat(currentCandle.close);
+    const prices = historical.map(c => parseFloat(c.close));
+
+    // Calculate indicators
+    const ema20 = TechnicalIndicators.calculateEMA(prices, CONFIG.EMA_PERIOD);
+    const rsi = TechnicalIndicators.calculateRSI(prices, CONFIG.RSI_PERIOD);
+    
+    if (!ema20 || !rsi) {
+      return null;
+    }
+
+    // Calculate volume metrics
+    const currentVolume = currentCandle.volume || 0;
+    const avgVolume = historical.reduce((sum, c) => sum + (c.volume || 0), 0) / historical.length;
+    const volumeRatio = avgVolume > 0 ? currentVolume / avgVolume : 0;
+
+    // Detect chart patterns
+    const patterns = this.patternDetector.detectAllPatterns(historical);
+
+    // Check breakout criteria
+    const breakoutSignal = this.checkBreakout({
+      symbolData,
+      currentPrice,
+      currentCandle,
+      ema20,
+      rsi,
+      volumeRatio,
+      avgVolume,
+      patterns,
+      historical,
+    });
+
+    if (!breakoutSignal) {
+      return null;
+    }
+
+    return {
+      data: breakoutSignal,
+      patterns,
+      historical,
+    };
+  }
+
+  checkBreakout({ symbolData, currentPrice, currentCandle, ema20, rsi, volumeRatio, avgVolume, patterns, historical }) {
+    let criteriaMet = 0;
+    const criteria = [];
+    let signalType = null;
+
+    // Determine signal type (Bullish or Bearish)
+    const isBullish = currentPrice > ema20 && rsi >= 50 && rsi <= 80;
+    const isBearish = currentPrice < ema20 && rsi >= 20 && rsi < 50;
+
+    if (!isBullish && !isBearish) {
+      return null;
+    }
+
+    signalType = isBullish ? 'BULLISH_BREAKOUT' : 'BEARISH_BREAKDOWN';
+
+    // Criterion 1: Price vs EMA20
+    if (isBullish && currentPrice > ema20) {
+      criteriaMet++;
+      criteria.push("Price above EMA20");
+    } else if (isBearish && currentPrice < ema20) {
+      criteriaMet++;
+      criteria.push("Price below EMA20");
+    }
+
+    // Criterion 2: RSI in momentum zone
+    if (isBullish && rsi >= 50 && rsi <= 80) {
+      criteriaMet++;
+      criteria.push("RSI in bullish zone");
+    } else if (isBearish && rsi >= 20 && rsi < 50) {
+      criteriaMet++;
+      criteria.push("RSI in bearish zone");
+    }
+
+    // Criterion 3: Volume breakout (2x average for F&O)
+    if (volumeRatio >= 2.0) {
+      criteriaMet++;
+      criteria.push(`Volume ${volumeRatio.toFixed(2)}x average`);
+    }
+
+    // Criterion 4: Price momentum
+    const prevCandle = historical[historical.length - 2];
+    const priceChange = ((currentPrice - prevCandle.close) / prevCandle.close) * 100;
+    
+    if (isBullish && priceChange > 0.5) {
+      criteriaMet++;
+      criteria.push(`+${priceChange.toFixed(2)}% momentum`);
+    } else if (isBearish && priceChange < -0.5) {
+      criteriaMet++;
+      criteria.push(`${priceChange.toFixed(2)}% momentum`);
+    }
+
+    // Criterion 5: Pattern detection
+    if (patterns.strongest) {
+      const patternMatch = (isBullish && patterns.strongest.type.includes('bullish')) ||
+                          (isBearish && patterns.strongest.type.includes('bearish'));
+      if (patternMatch) {
+        criteriaMet++;
+        criteria.push(`Pattern: ${patterns.strongest.name}`);
+      }
+    }
+
+    const confidence = criteriaMet / 5;
+
+    if (criteriaMet >= CONFIG.MIN_CRITERIA_MET && confidence >= CONFIG.MIN_CONFIDENCE_TO_SAVE) {
+      // Calculate targets and stop loss for options
+      const swingLow = TechnicalIndicators.findRecentSwingLow(historical, 10);
+      const swingHigh = TechnicalIndicators.findRecentSwingHigh(historical, 10);
+      
+      // For options, use tighter stops and more aggressive targets
+      const stopLoss = isBullish 
+        ? (swingLow ? parseFloat(swingLow.toFixed(2)) : parseFloat((currentPrice * 0.95).toFixed(2)))
+        : (swingHigh ? parseFloat(swingHigh.toFixed(2)) : parseFloat((currentPrice * 1.05).toFixed(2)));
+      
+      const target1 = isBullish 
+        ? parseFloat((currentPrice * 1.10).toFixed(2)) // 10% target
+        : parseFloat((currentPrice * 0.90).toFixed(2));
+      
+      const target2 = isBullish 
+        ? parseFloat((currentPrice * 1.20).toFixed(2)) // 20% target
+        : parseFloat((currentPrice * 0.80).toFixed(2));
+      
+      return {
+        symbol: symbolData.symbol,
+        instrument_token: symbolData.instrument_token,
+        underlying: symbolData.underlying,
+        instrument_type: symbolData.instrument_type,
+        expiry: symbolData.expiry,
+        strike: symbolData.strike,
+        option_type: symbolData.option_type,
+        signal_type: signalType,
+        entry_price: currentPrice,
+        ema20_5min: parseFloat(ema20.toFixed(2)),
+        rsi14_5min: parseFloat(rsi.toFixed(2)),
+        volume: currentCandle.volume || 0,
+        avg_volume: Math.round(avgVolume),
+        candle_time: currentCandle.timestamp,
+        target1,
+        target2,
+        stop_loss: stopLoss,
+        probability: parseFloat(confidence.toFixed(2)),
+        criteria_met: criteriaMet,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    return null;
+  }
+
+  async cleanupStaleSignals() {
+    try {
+      await this.db.cleanupStaleSignals('nse_fo_signals', CONFIG.SIGNAL_TTL_MINUTES);
+      console.log(`🧹 Cleaned up stale F&O signals older than ${CONFIG.SIGNAL_TTL_MINUTES} minutes`);
+    } catch (error) {
+      console.error('❌ Cleanup failed:', error.message);
+    }
   }
 
   async start() {
-    console.log("🚀 Starting NSE F&O Scanner...");
+    console.log("🚀 Starting NSE F&O Scanner (Batch Mode)...");
 
     const initialized = await this.initialize();
     if (!initialized) {
@@ -546,22 +312,40 @@ class NseFoScanner {
       process.exit(1);
     }
 
-    // Run initial scan
-    await this.scanForSignals();
+    // Run immediate scan
+    await this.scanAllSymbols();
 
     // Schedule periodic scans
     this.scanInterval = setInterval(async () => {
-      await this.scanForSignals();
+      // Only scan during market hours
+      if (MarketHoursChecker.isMarketOpen()) {
+        await this.scanAllSymbols();
+      } else {
+        console.log("⏸️ Market closed. Waiting for next market open...");
+        const nextOpen = MarketHoursChecker.getNextMarketOpen();
+        console.log(`📅 Next market open: ${nextOpen.toLocaleString()}`);
+      }
     }, CONFIG.SCAN_INTERVAL_MS);
+
+    // Schedule cleanup
+    this.cleanupInterval = setInterval(async () => {
+      await this.cleanupStaleSignals();
+    }, CONFIG.CLEANUP_INTERVAL_MS);
+
+    // Log status every 10 minutes
+    setInterval(() => {
+      this.monitor.logStatus();
+      this.monitor.logMemoryUsage();
+      this.aiFilter.logStats();
+    }, 10 * 60 * 1000);
 
     console.log(`✅ Scanner running. Scanning every ${CONFIG.SCAN_INTERVAL_MS / 1000}s...`);
   }
 
   stop() {
-    if (this.scanInterval) {
-      clearInterval(this.scanInterval);
-      console.log("⏹️ NSE F&O Scanner stopped.");
-    }
+    if (this.scanInterval) clearInterval(this.scanInterval);
+    if (this.cleanupInterval) clearInterval(this.cleanupInterval);
+    console.log("⏹️ NSE F&O Scanner stopped.");
   }
 }
 
