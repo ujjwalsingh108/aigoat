@@ -113,13 +113,25 @@ class AiBreakoutFilter {
       return result;
     } catch (error) {
       this.stats.errors++;
-      console.error("❌ AI validation error:", error.message);
+      
+      // Check if rate limit error
+      const isRateLimit = error.message && (
+        error.message.includes('rate limit') || 
+        error.message.includes('Rate limit') ||
+        error.message.includes('429')
+      );
+      
+      if (isRateLimit) {
+        console.warn(`⏳ Groq API rate limit reached - signal will be saved without AI validation`);
+      } else {
+        console.error("❌ AI validation error:", error.message);
+      }
 
       // Fallback: return unvalidated signal
       return {
         verdict: "ERROR",
         confidence: signal.probability || 0.5,
-        reasoning: `AI validation failed: ${error.message}`,
+        reasoning: isRateLimit ? 'Rate limit reached' : `AI validation failed: ${error.message}`,
         risk_factors: ["AI validation unavailable"],
         entry_suggestion: "Use manual judgment",
         ai_validated: false,

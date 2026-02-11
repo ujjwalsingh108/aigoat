@@ -24,7 +24,7 @@ const CONFIG = {
   EMA_PERIOD: 20,
   SMA_PERIOD: 50,
   RSI_PERIOD: 14,
-  MIN_CANDLES_FOR_ANALYSIS: 50, // Need at least 50 days for SMA50
+  MIN_CANDLES_FOR_ANALYSIS: 20, // Need at least 20 days for analysis
   
   // Signal generation criteria
   // BULLISH
@@ -164,7 +164,7 @@ class BseSwingPositionalScanner {
     let dailyCandles = cache.get(cacheKey);
     
     if (!dailyCandles) {
-      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_bse_swing_hourly', 365);
+      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_bse_swing_hourly', 20);
       // Cache for 23 hours (refreshes before next daily scan)
       cache.set(cacheKey, dailyCandles, 82800);
     }

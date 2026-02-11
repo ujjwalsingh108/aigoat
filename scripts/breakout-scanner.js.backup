@@ -122,7 +122,6 @@ class NseEquityScanner {
 
     const currentCandle = historical[historical.length - 1];
     const currentPrice = parseFloat(currentCandle.close);
-    const openPrice = parseFloat(currentCandle.open);
     const prices = historical.map(c => parseFloat(c.close));
 
     // Calculate indicators using shared utilities
@@ -146,7 +145,6 @@ class NseEquityScanner {
     const bullishSignal = this.checkBullishBreakout({
       symbol,
       currentPrice,
-      openPrice,
       ema20,
       dailyEMA20,
       rsi,
@@ -170,7 +168,7 @@ class NseEquityScanner {
     return { bullish: bullishSignal, bearish: bearishSignal };
   }
 
-  checkBullishBreakout({ symbol, currentPrice, openPrice, ema20, dailyEMA20, rsi, volatility, volumeOk, patterns, historical }) {
+  checkBullishBreakout({ symbol, currentPrice, ema20, dailyEMA20, rsi, volatility, volumeOk, patterns, historical }) {
     let criteriaMet = 0;
     const criteria = [];
 
@@ -192,25 +190,19 @@ class NseEquityScanner {
       criteria.push("Volume breakout");
     }
 
-    // Criterion 4: Open <= Close (bullish candle)
-    if (openPrice <= currentPrice) {
-      criteriaMet++;
-      criteria.push("Bullish candle");
-    }
-
-    // Criterion 5: RSI 50-80 (momentum)
+    // Criterion 4: RSI 50-80 (momentum)
     if (rsi >= 50 && rsi <= 80) {
       criteriaMet++;
       criteria.push("RSI momentum");
     }
 
-    // Criterion 6: Bullish pattern
+    // Criterion 5: Bullish pattern
     if (patterns.strongest && patterns.strongest.type.includes('bullish')) {
       criteriaMet++;
       criteria.push(`Pattern: ${patterns.strongest.name}`);
     }
 
-    const confidence = criteriaMet / 6;
+    const confidence = criteriaMet / 5;
 
     if (criteriaMet >= CONFIG.MIN_CRITERIA_MET && confidence >= CONFIG.MIN_CONFIDENCE_TO_SAVE) {
       const swingLow = TechnicalIndicators.findRecentSwingLow(historical, 10);

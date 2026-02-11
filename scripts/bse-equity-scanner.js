@@ -89,33 +89,85 @@ class BseEquityScanner {
         const { bullish, bearish, historical, patterns } = await this.analyzeSymbol(symbolData);
         
         if (bullish) {
-          const aiResult = await this.aiFilter.validateBreakout(bullish, { patterns, historicalCandles: historical });
+          let enrichedSignal = { ...bullish };
           
-          if (this.aiFilter.shouldSaveSignal(aiResult)) {
-            const enrichedSignal = {
+          try {
+            const aiResult = await this.aiFilter.validateBreakout(bullish, { patterns, historicalCandles: historical });
+            
+            if (aiResult.verdict !== 'ERROR' && this.aiFilter.shouldSaveSignal(aiResult, CONFIG.MIN_CONFIDENCE_TO_SAVE)) {
+              enrichedSignal = {
+                ...bullish,
+                ai_verdict: aiResult.verdict,
+                ai_confidence: aiResult.confidence,
+                ai_reasoning: aiResult.reasoning,
+                ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+                ai_validated: aiResult.ai_validated,
+              };
+            } else if (aiResult.verdict === 'ERROR') {
+              enrichedSignal = {
+                ...bullish,
+                ai_verdict: null,
+                ai_confidence: null,
+                ai_reasoning: 'AI validation unavailable',
+                ai_risk_factors: null,
+                ai_validated: false,
+              };
+            }
+          } catch (error) {
+            console.error(`⚠️ AI validation failed for ${bullish.symbol}, saving without AI:`, error.message);
+            enrichedSignal = {
               ...bullish,
-              ai_verdict: aiResult.verdict,
-              ai_confidence: aiResult.confidence,
-              ai_reasoning: aiResult.reasoning,
-              ai_risk_factors: JSON.stringify(aiResult.risk_factors),
-              ai_validated: aiResult.ai_validated,
+              ai_verdict: null,
+              ai_confidence: null,
+              ai_reasoning: 'AI validation failed',
+              ai_risk_factors: null,
+              ai_validated: false,
             };
+          }
+          
+          if (bullish.probability >= CONFIG.MIN_CONFIDENCE_TO_SAVE) {
             await this.db.saveBullishSignal(enrichedSignal, 'bullish_breakout_bse_eq');
             bullishSignals++;
           }
         }
         if (bearish) {
-          const aiResult = await this.aiFilter.validateBreakout(bearish, { patterns, historicalCandles: historical });
+          let enrichedSignal = { ...bearish };
           
-          if (this.aiFilter.shouldSaveSignal(aiResult)) {
-            const enrichedSignal = {
+          try {
+            const aiResult = await this.aiFilter.validateBreakout(bearish, { patterns, historicalCandles: historical });
+            
+            if (aiResult.verdict !== 'ERROR' && this.aiFilter.shouldSaveSignal(aiResult, CONFIG.MIN_CONFIDENCE_TO_SAVE)) {
+              enrichedSignal = {
+                ...bearish,
+                ai_verdict: aiResult.verdict,
+                ai_confidence: aiResult.confidence,
+                ai_reasoning: aiResult.reasoning,
+                ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+                ai_validated: aiResult.ai_validated,
+              };
+            } else if (aiResult.verdict === 'ERROR') {
+              enrichedSignal = {
+                ...bearish,
+                ai_verdict: null,
+                ai_confidence: null,
+                ai_reasoning: 'AI validation unavailable',
+                ai_risk_factors: null,
+                ai_validated: false,
+              };
+            }
+          } catch (error) {
+            console.error(`⚠️ AI validation failed for ${bearish.symbol}, saving without AI:`, error.message);
+            enrichedSignal = {
               ...bearish,
-              ai_verdict: aiResult.verdict,
-              ai_confidence: aiResult.confidence,
-              ai_reasoning: aiResult.reasoning,
-              ai_risk_factors: JSON.stringify(aiResult.risk_factors),
-              ai_validated: aiResult.ai_validated,
+              ai_verdict: null,
+              ai_confidence: null,
+              ai_reasoning: 'AI validation failed',
+              ai_risk_factors: null,
+              ai_validated: false,
             };
+          }
+          
+          if (bearish.probability >= CONFIG.MIN_CONFIDENCE_TO_SAVE) {
             await this.db.saveBearishSignal(enrichedSignal, 'bearish_breakout_bse_eq');
             bearishSignals++;
           }
@@ -148,7 +200,7 @@ class BseEquityScanner {
     if (!historical || !daily) {
       [historical, daily] = await Promise.all([
         this.db.getHistoricalData(symbol, 'historical_prices_bse_equity', 50),
-        this.db.getDailyCandles(symbol, 'historical_prices_bse_equity', 365),
+        this.db.getDailyCandles(symbol, 'historical_prices_bse_equity', 20),
       ]);
       
       // Cache 5-min data for 5 minutes (gets fresh data every few scans)

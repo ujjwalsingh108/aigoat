@@ -153,7 +153,6 @@ class FoDatabaseClient {
             implied_volatility: signal.implied_volatility,
             confidence_score: signal.confidence_score,
             created_by: "bse_fo_scanner",
-            last_scanned_at: new Date().toISOString(),
           },
           {
             onConflict: "symbol",

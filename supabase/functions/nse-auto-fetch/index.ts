@@ -52,12 +52,12 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-// Get all NSE equity symbols from nse_bse_equity_top_1000_symbols table
+// Get all NSE equity symbols from nse_equity_top_1000_symbols table
 async function getSymbolsFromDB(): Promise<
   Array<{ symbol: string; instrument_token: string }>
 > {
   const { data, error } = await supabase
-    .from("nse_bse_equity_top_1000_symbols")
+    .from("nse_equity_top_1000_symbols")
     .select("symbol, instrument_token")
     .eq("is_active", true)
     .order("symbol", { ascending: true });
@@ -66,7 +66,7 @@ async function getSymbolsFromDB(): Promise<
 
   if (!data || data.length === 0) {
     throw new Error(
-      "No symbols found in nse_bse_equity_top_1000_symbols table."
+      "No symbols found in nse_equity_top_1000_symbols table."
     );
   }
 

@@ -206,13 +206,13 @@ class DatabaseClient {
   /**
    * Get daily candles
    */
-  async getDailyCandles(symbol, table, days = 365) {
+  async getDailyCandles(symbol, table, days = 20) {
     return this.queryWithRetry(async () => {
       const { data, error } = await this.supabase
         .from(table)
         .select("date, time, timestamp, open, high, low, close, volume")
         .eq("symbol", symbol)
-        .eq("time", "15:30") // Daily close
+        .in("time", ["15:30", "15:25", "15:20"]) // Market close candles (check multiple times for flexibility)
         .order("timestamp", { ascending: false })
         .limit(days);
 
@@ -228,16 +228,7 @@ class DatabaseClient {
     return this.queryWithRetry(async () => {
       const { error } = await this.supabase
         .from(tableName)
-        .upsert(
-          {
-            ...signal,
-            last_scanned_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "symbol,signal_type",
-            ignoreDuplicates: false,
-          }
-        );
+        .insert(signal);
 
       if (error) throw error;
       return true;
@@ -251,16 +242,7 @@ class DatabaseClient {
     return this.queryWithRetry(async () => {
       const { error } = await this.supabase
         .from(tableName)
-        .upsert(
-          {
-            ...signal,
-            last_scanned_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "symbol,signal_type",
-            ignoreDuplicates: false,
-          }
-        );
+        .insert(signal);
 
       if (error) throw error;
       return true;
@@ -279,7 +261,6 @@ class DatabaseClient {
         .upsert(
           {
             ...signal,
-            last_scanned_at: new Date().toISOString(),
           },
           {
             onConflict: "symbol",
@@ -303,7 +284,6 @@ class DatabaseClient {
           {
             ...signal,
             exchange: 'BSE',
-            last_scanned_at: new Date().toISOString(),
           },
           {
             onConflict: "symbol",
@@ -327,7 +307,6 @@ class DatabaseClient {
           {
             ...signal,
             exchange: 'BSE',
-            last_scanned_at: new Date().toISOString(),
           },
           {
             onConflict: "symbol",
@@ -350,7 +329,7 @@ class DatabaseClient {
       const { error } = await this.supabase
         .from(tableName)
         .delete()
-        .lt("last_scanned_at", cutoffTime);
+        .lt("created_at", cutoffTime);
 
       if (error) throw error;
       return true;
