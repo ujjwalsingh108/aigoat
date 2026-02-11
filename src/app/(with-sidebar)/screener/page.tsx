@@ -57,7 +57,7 @@ export default function Screener() {
             "created_at",
             new Date(Date.now() - 15 * 60 * 1000).toISOString()
           )
-          .gte("probability", 0.3);
+          .gte("probability", 0.6);
 
         // Get BSE bullish count from last 15 minutes
         const { count: bseBullish } = await supabase
@@ -77,7 +77,7 @@ export default function Screener() {
             "created_at",
             new Date(Date.now() - 15 * 60 * 1000).toISOString()
           )
-          .gte("probability", 0.3);
+          .gte("probability", 0.6);
 
         // Get BSE swing bullish count from last 15 minutes
         const { count: bseSwingBullish } = await supabase

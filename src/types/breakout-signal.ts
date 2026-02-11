@@ -38,16 +38,21 @@ export type BreakoutSignal = {
   symbol: string;
   signal_type: "BULLISH_BREAKOUT" | "BEARISH_BREAKDOWN" | "NEUTRAL";
   probability: number;
-  criteria_met: number;
-  current_price: number;
-  daily_ema20: number;
-  fivemin_ema20: number;
-  rsi_value: number;
-  volume_ratio: number;
-  predicted_direction: "UP" | "DOWN" | "SIDEWAYS";
-  target_price: number;
-  stop_loss: number;
-  confidence: number;
+  criteria_met: number | string; // Can be number or text description
+  entry_price?: number; // Scanner uses entry_price
+  current_price?: number; // Alias for entry_price
+  daily_ema20?: number;
+  fivemin_ema20?: number;
+  ema20_5min?: number; // Scanner uses ema20_5min
+  rsi_value?: number;
+  rsi?: number; // Scanner uses rsi
+  volume_ratio?: number;
+  volatility?: number;
+  predicted_direction?: "UP" | "DOWN" | "SIDEWAYS";
+  target_price?: number;
+  stop_loss?: number;
+  confidence?: number;
+  pattern?: string | null;
   created_at: string;
   user_id?: string;
   created_by?: string;

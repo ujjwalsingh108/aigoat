@@ -15,14 +15,14 @@ export const runtime = "nodejs";
  * 
  * Query params:
  * - minutesAgo: number (default: 15) - Get signals from last N minutes
- * - maxProbability: number (default: 0.3) - Maximum confidence threshold
+ * - minProbability: number (default: 0.6) - Minimum confidence threshold
  * - limit: number (default: 50) - Max results
  */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const minutesAgo = parseInt(searchParams.get("minutesAgo") || "15");
-    const maxProbability = parseFloat(searchParams.get("maxProbability") || "0.3");
+    const minProbability = parseFloat(searchParams.get("minProbability") || "0.6");
     const limit = parseInt(searchParams.get("limit") || "50");
 
     // Build cache key
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
             "created_at",
             new Date(Date.now() - minutesAgo * 60 * 1000).toISOString()
           )
-          .lte("probability", maxProbability)
+          .gte("probability", minProbability)
           .order("created_at", { ascending: false })
           .limit(limit);
 

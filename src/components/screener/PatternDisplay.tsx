@@ -25,6 +25,9 @@ export function PatternDisplay({ signal }: PatternDisplayProps) {
     console.error('Error parsing patterns:', e);
   }
 
+  // If no full patterns object but we have pattern name and confidence, create a simple display
+  const hasSimplePattern = signal.pattern && signal.pattern_confidence;
+  
   const handleAIValidation = async () => {
     setIsValidating(true);
     
@@ -104,6 +107,24 @@ export function PatternDisplay({ signal }: PatternDisplayProps) {
   };
 
   if (!patterns || !patterns.strongest) {
+    // If we have simple pattern data, display it
+    if (hasSimplePattern) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {signal.pattern}
+            </Badge>
+            {signal.pattern_confidence && (
+              <span className="text-xs text-muted-foreground">
+                {(signal.pattern_confidence * 100).toFixed(0)}% confidence
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="text-xs text-muted-foreground">
         No chart patterns detected

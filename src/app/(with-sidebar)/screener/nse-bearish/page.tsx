@@ -40,7 +40,7 @@ export default function IntradayBearishPage() {
       setIsLoading(true);
 
       // Use cached API route instead of direct Supabase query
-      const response = await fetch("/api/signals/bearish?minutesAgo=15&maxProbability=0.3&limit=50");
+      const response = await fetch("/api/signals/bearish?minutesAgo=15&minProbability=0.6&limit=50");
       const result = await response.json();
 
       if (!result.success) {
@@ -260,22 +260,22 @@ function IntradayBearishCard({ signal }: { signal: IntradayBearishSignal }) {
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-muted-foreground">Current Price</p>
-            <p className="font-semibold">₹{signal.current_price.toFixed(2)}</p>
+            <p className="font-semibold">₹{signal.current_price?.toFixed(2) || "N/A"}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Opening</p>
-            <p className="font-semibold">₹{signal.opening_price.toFixed(2)}</p>
+            <p className="font-semibold">₹{signal.opening_price?.toFixed(2) || "N/A"}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Target</p>
             <p className="font-semibold text-red-600">
-              ₹{signal.target_price.toFixed(2)}
+              ₹{signal.target_price?.toFixed(2) || "N/A"}
             </p>
           </div>
           <div>
             <p className="text-muted-foreground">Stop Loss</p>
             <p className="font-semibold text-green-600">
-              ₹{signal.stop_loss.toFixed(2)}
+              ₹{signal.stop_loss?.toFixed(2) || "N/A"}
             </p>
           </div>
         </div>
@@ -316,7 +316,7 @@ function IntradayBearishCard({ signal }: { signal: IntradayBearishSignal }) {
         <div className="flex items-center justify-between pt-2 border-t">
           <span className="text-xs text-muted-foreground">Confidence</span>
           <Badge variant="outline" className="text-xs">
-            {(signal.probability * 100).toFixed(0)}%
+            {signal.probability ? (signal.probability * 100).toFixed(0) : "0"}%
           </Badge>
         </div>
       </CardContent>

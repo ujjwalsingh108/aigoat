@@ -11,24 +11,29 @@ interface BreakoutSignalCardProps {
 }
 
 export function BreakoutSignalCard({ signal }: BreakoutSignalCardProps) {
-  const confidence = (signal.probability * 100).toFixed(1);
-  const price = signal.current_price?.toFixed(2) || "0.00";
+  const confidence = signal.probability ? (signal.probability * 100).toFixed(1) : "0.0";
+  
+  // Handle both entry_price and current_price field names
+  const currentPrice = signal.current_price || signal.entry_price || 0;
+  const price = currentPrice > 0 ? currentPrice.toFixed(2) : "0.00";
   const target = signal.target_price?.toFixed(2) || "0.00";
   const stopLoss = signal.stop_loss?.toFixed(2) || "0.00";
-  const rsi = signal.rsi_value?.toFixed(1) || "0.0";
+  
+  // Handle both rsi and rsi_value field names
+  const rsiValue = signal.rsi_value || signal.rsi || 0;
+  const rsi = rsiValue > 0 ? rsiValue.toFixed(1) : "0.0";
 
-  const potentialReturn =
-    signal.predicted_direction === "UP"
-      ? (
-          ((signal.target_price - signal.current_price) /
-            signal.current_price) *
-          100
-        ).toFixed(2)
-      : (
-          ((signal.current_price - signal.target_price) /
-            signal.current_price) *
-          100
-        ).toFixed(2);
+  // Calculate potential return with safety checks
+  let potentialReturn = "N/A";
+  if (currentPrice > 0 && signal.target_price && signal.target_price > 0) {
+    const returnValue = signal.predicted_direction === "UP"
+      ? (((signal.target_price - currentPrice) / currentPrice) * 100)
+      : (((currentPrice - signal.target_price) / currentPrice) * 100);
+    
+    if (isFinite(returnValue)) {
+      potentialReturn = returnValue.toFixed(2) + "%";
+    }
+  }
 
   const signalColor =
     signal.signal_type === "BULLISH_BREAKOUT"
@@ -123,7 +128,7 @@ export function BreakoutSignalCard({ signal }: BreakoutSignalCardProps) {
                 : "text-red-600"
             }`}
           >
-            {potentialReturn}%
+            {potentialReturn}
           </div>
         </div>
       </div>
