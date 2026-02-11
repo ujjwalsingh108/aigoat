@@ -132,12 +132,12 @@ export default function IntradayBearishPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 1
               </div>
-              <span>NIFTY Equity Stocks (Approx. 2500 stocks)</span>
+              <span>NIFTY Equity Stocks</span>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
@@ -203,7 +203,7 @@ export default function IntradayBearishPage() {
 
       {/* Signals Grid */}
       {signals.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
           {signals.map((signal) => (
             <IntradayBearishCard key={signal.id} signal={signal} />
           ))}

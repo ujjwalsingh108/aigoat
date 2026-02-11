@@ -134,7 +134,7 @@ export default function NseFOPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
             <div className="flex items-start gap-2">
               <TrendingUp className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -232,7 +232,7 @@ export default function NseFOPage() {
 
       {/* Signals Grid */}
       {filteredSignals.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
           {filteredSignals.map((signal: any, idx: number) => (
             <Card key={idx} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">

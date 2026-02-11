@@ -76,28 +76,29 @@ export default function IntradayBullishPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-0">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-3 md:mt-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between mt-2 sm:mt-3 md:mt-6">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 sm:h-10 sm:w-10"
             onClick={() => router.push("/screener")}
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              <TrendingUp className="h-7 w-7 text-green-500" />
-              Intraday Equity Bullish
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-green-500" />
+              <span className="break-words">Intraday Equity Bullish</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
               Bullish breakout signals with high probability setups
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <span className="text-xs text-muted-foreground">
             Updated: {lastUpdate.toLocaleTimeString()}
           </span>
@@ -138,7 +139,7 @@ export default function IntradayBullishPage() {
               <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
                 1
               </div>
-              <span>NIFTY Equity Stocks (Approx. 2500 stocks)</span>
+              <span>NIFTY Equity Stocks</span>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
@@ -204,7 +205,7 @@ export default function IntradayBullishPage() {
 
       {/* Signals Grid */}
       {signals.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
           {signals.map((signal) => (
             <BreakoutSignalCard key={signal.id} signal={signal} />
           ))}

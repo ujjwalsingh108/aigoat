@@ -278,9 +278,9 @@ export default function Screener() {
   };
 
   return (
-    <div className="p-3 md:p-4 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">
+    <div className="p-2 sm:p-3 md:p-4 lg:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
           Discover Your Next Winning Trades
         </h1>
         <input
@@ -293,7 +293,7 @@ export default function Screener() {
         {/* <div className="flex flex-col items-start sm:items-end">
           <Button
             variant="default"
-            className="mb-2 cursor-pointer text-sm md:text-base w-full sm:w-auto"
+            className="mb-2 cursor-pointer text-xs sm:text-sm md:text-base w-full sm:w-auto"
             onClick={handleButtonClick}
             disabled={uploading}
           >

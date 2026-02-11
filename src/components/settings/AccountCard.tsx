@@ -110,29 +110,29 @@ export function AccountCard() {
 
   return (
     <Card>
-      <CardContent className="p-6 space-y-6">
+      <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {loading ? (
           <Loading message="Loading account..." />
         ) : (
           <>
             {/* Profile Picture + UID */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-col justify-center">
-                <h2 className="text-sm text-muted-foreground mb-1">
+            <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3 xs:gap-4">
+              <div className="flex flex-col justify-center flex-1 min-w-0">
+                <h2 className="text-xs sm:text-sm text-muted-foreground mb-1">
                   Profile Picture
                 </h2>
-                <div className="text-sm flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-muted-foreground break-all">
+                <div className="text-xs sm:text-sm flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground break-all">
                     UID: {user?.id ?? "—"}
                   </span>
                   <CopyIcon
-                    className="w-4 h-4 cursor-pointer"
+                    className="w-3 h-3 sm:w-4 sm:h-4 cursor-pointer flex-shrink-0 hover:text-primary transition-colors"
                     onClick={handleCopy}
                   />
                 </div>
               </div>
 
-              <Avatar className="w-12 h-12 sm:w-16 sm:h-16 cursor-pointer">
+              <Avatar className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 cursor-pointer flex-shrink-0 ring-2 ring-primary/10">
                 {/* ✅ Show the Google profile picture */}
                 <AvatarImage
                   src={user?.user_metadata?.picture}
@@ -140,23 +140,23 @@ export function AccountCard() {
                 />
 
                 {/* ✅ Fallback (if no picture available) */}
-                <AvatarFallback>
+                <AvatarFallback className="text-sm sm:text-base">
                   {user?.email ? user.email[0].toUpperCase() : "U"}
                 </AvatarFallback>
               </Avatar>
             </div>
 
-            <div className="my-6 border-t" />
+            <div className="my-4 sm:my-6 border-t" />
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Username */}
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm text-muted-foreground">User Name</h3>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm">
+              <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-2">
+                <h3 className="text-xs sm:text-sm text-muted-foreground">User Name</h3>
+                <div className="flex items-center justify-between xs:justify-end gap-2">
+                  <span className="truncate text-xs sm:text-sm max-w-[200px] sm:max-w-none">
                     {member?.organizations?.name ?? "—"}
                   </span>
-                  <SquarePen className="w-3 h-3 cursor-pointer" />
+                  <SquarePen className="w-3 h-3 cursor-pointer flex-shrink-0 hover:text-primary transition-colors" />
                 </div>
               </div>
 

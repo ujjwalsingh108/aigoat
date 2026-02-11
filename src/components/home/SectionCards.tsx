@@ -50,7 +50,7 @@ export const SectionCards: React.FC<SectionCardProps> = ({
   
   return (
     <Card 
-      className="relative overflow-hidden transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] cursor-pointer border-0"
+      className="relative overflow-hidden transition-all duration-300 shadow-lg hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer border-0 touch-manipulation min-h-[180px] sm:min-h-[200px]"
       onClick={handleClick}
     >
       <div
@@ -60,20 +60,20 @@ export const SectionCards: React.FC<SectionCardProps> = ({
           backgroundSize: "cover",
         }}
       />
-      <div className="grid grid-cols-1 gap-4 p-4 relative z-10">
-        <CardHeader className="space-y-3">
-          <CardDescription className="text-white/90 text-xs uppercase tracking-wider font-semibold drop-shadow">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 p-3 sm:p-4 md:p-5 relative z-10">
+        <CardHeader className="space-y-2 sm:space-y-3 p-0">
+          <CardDescription className="text-white/90 text-[10px] sm:text-xs uppercase tracking-wider font-semibold drop-shadow">
             {title}
           </CardDescription>
-          <CardTitle className="text-2xl font-bold tabular-nums @[250px]/card:text-3xl text-white drop-shadow-lg">
+          <CardTitle className="text-xl sm:text-2xl md:text-3xl font-bold tabular-nums text-white drop-shadow-lg">
             {tag}
           </CardTitle>
           <CardAction className="flex items-center gap-2">
             {/* You can add more content here if needed */}
           </CardAction>
         </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm pb-4">
-          <div className="line-clamp-2 flex gap-2 font-medium text-white/95 drop-shadow">
+        <CardFooter className="flex-col items-start gap-1 sm:gap-1.5 text-xs sm:text-sm pb-2 sm:pb-4 p-0">
+          <div className="line-clamp-2 sm:line-clamp-3 flex gap-2 font-medium text-white/95 drop-shadow">
             {description}
           </div>
         </CardFooter>

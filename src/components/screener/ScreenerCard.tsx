@@ -87,7 +87,7 @@ export function ScreenerCard({
   
   return (
     <Card
-      className="relative h-40 sm:h-44 md:h-48 overflow-hidden rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer border-0"
+      className="relative h-36 xs:h-40 sm:h-44 md:h-48 lg:h-52 overflow-hidden rounded-lg sm:rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer border-0 touch-manipulation"
       onClick={handleClick}
     >
       <div

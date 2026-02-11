@@ -129,3 +129,106 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Responsive Utilities */
+@layer utilities {
+  /* Touch-friendly minimum tap targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Smooth scrolling for mobile */
+  .smooth-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Prevent text selection on touch */
+  .no-touch-select {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Responsive text sizing */
+  .text-responsive-xs {
+    @apply text-[10px] sm:text-xs;
+  }
+  
+  .text-responsive-sm {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .text-responsive-base {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-lg {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+  
+  .text-responsive-xl {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+  
+  /* Responsive spacing */
+  .p-responsive {
+    @apply p-3 sm:p-4 md:p-5 lg:p-6;
+  }
+  
+  .px-responsive {
+    @apply px-3 sm:px-4 md:px-5 lg:px-6;
+  }
+  
+  .py-responsive {
+    @apply py-3 sm:py-4 md:py-5 lg:py-6;
+  }
+  
+  /* Grid gap responsive */
+  .gap-responsive {
+    @apply gap-3 sm:gap-4 md:gap-5 lg:gap-6;
+  }
+  
+  /* Responsive container */
+  .container-responsive {
+    @apply mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
+  }
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 639px) {
+  /* Improve tap targets on mobile */
+  button, a, [role="button"] {
+    @apply min-h-[44px];
+  }
+  
+  /* Better mobile scrolling */
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent zoom on input focus */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 640px) and (max-width: 1023px) {
+  /* Optimize card layouts for tablet */
+  .card-grid {
+    @apply grid-cols-2;
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1024px) {
+  /* Better hover states on desktop */
+  .hover-lift {
+    @apply transition-transform duration-200;
+  }
+  
+  .hover-lift:hover {
+    @apply -translate-y-1;
+  }
+}
