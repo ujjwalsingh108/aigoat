@@ -146,7 +146,7 @@ export default function BSEBullishPage() {
               <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">
                 1
               </div>
-              <span>BSE Equity Stocks (12,704 stocks)</span>
+              <span>BSE Equity Stocks</span>
             </div>
             <div className="flex items-start gap-2">
               <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-bold text-green-700 dark:text-green-400 flex-shrink-0">

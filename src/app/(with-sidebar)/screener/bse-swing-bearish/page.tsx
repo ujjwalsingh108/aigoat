@@ -134,7 +134,7 @@ export default function BSESwingBearishPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
             <div className="flex items-start gap-2">
               <Badge className="bg-red-500/20 text-red-500 mt-1">1</Badge>
-              <span className="text-sm">BSE Equity Stocks (12,704 stocks)</span>
+              <span className="text-sm">BSE Equity Stocks</span>
             </div>
             <div className="flex items-start gap-2">
               <Badge className="bg-red-500/20 text-red-500 mt-1">2</Badge>
