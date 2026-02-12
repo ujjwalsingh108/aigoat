@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { IntradayBearishSignal } from "@/types/breakout-signal";
+import { BreakoutSignal } from "@/types/breakout-signal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Activity,
@@ -16,6 +16,7 @@ import {
   BarChart3,
   ArrowLeft,
 } from "lucide-react";
+import { BreakoutSignalCard } from "@/components/screener/BreakoutDashboard";
 import { AIScreenerButton } from "@/components/screener/AIScreenerButton";
 
 // Lazy load AI panel (code-split for performance)
@@ -27,7 +28,7 @@ const AIScreenerPanel = lazy(() =>
 
 export default function IntradayBearishPage() {
   const router = useRouter();
-  const [signals, setSignals] = useState<IntradayBearishSignal[]>([]);
+  const [signals, setSignals] = useState<BreakoutSignal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
@@ -75,28 +76,29 @@ export default function IntradayBearishPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-0">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-3 md:mt-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between mt-2 sm:mt-3 md:mt-6">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 sm:h-10 sm:w-10"
             onClick={() => router.push("/screener")}
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              <TrendingDown className="h-7 w-7 text-red-500" />
-              Intraday Equity Bearish
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-red-500" />
+              <span className="break-words">Intraday Equity Bearish</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
               NIFTY 250 stocks with bearish intraday setup
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <span className="text-xs text-muted-foreground">
             Updated: {lastUpdate.toLocaleTimeString()}
           </span>
@@ -125,58 +127,58 @@ export default function IntradayBearishPage() {
 
       {/* Strategy Info Card */}
       <Card className="border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-950/20">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Activity className="h-5 w-5 text-red-600" />
-            Strategy Criteria (6 Total)
+        <CardHeader className="pb-3 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+            <span className="break-words">Strategy Criteria (6 Total)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
             <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 1
               </div>
-              <span>NIFTY Equity Stocks</span>
+              <span className="leading-relaxed">NIFTY Equity Stocks</span>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 2
               </div>
-              <span>Trading below 20 EMA (Daily)</span>
+              <span className="leading-relaxed">Trading below 20 EMA (Daily)</span>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 3
               </div>
-              <span>Trading below 20 EMA (5-min)</span>
+              <span className="leading-relaxed">Trading below 20 EMA (5-min)</span>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 4
               </div>
-              <span>Avg 3-day volume &gt; Previous day volume</span>
+              <span className="leading-relaxed">Avg 3-day volume &gt; Previous day volume</span>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 5
               </div>
-              <span>Opening price &gt; Current price</span>
+              <span className="leading-relaxed">Opening price &gt; Current price</span>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
+              <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-xs font-bold text-red-700 dark:text-red-400 flex-shrink-0">
                 6
               </div>
-              <span>RSI: 20 &lt; RSI &lt; 50</span>
+              <span className="leading-relaxed">RSI: 20 &lt; RSI &lt; 50</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Signals Count */}
-      <div className="flex items-center gap-4">
-        <Badge variant="outline" className="text-base px-4 py-2">
-          <BarChart3 className="h-4 w-4 mr-2" />
+      <div className="flex items-center gap-2 sm:gap-4">
+        <Badge variant="outline" className="text-sm sm:text-base px-3 sm:px-4 py-1.5 sm:py-2">
+          <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
           {signals.length} Active Signals
         </Badge>
       </div>
@@ -205,7 +207,7 @@ export default function IntradayBearishPage() {
       {signals.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
           {signals.map((signal) => (
-            <IntradayBearishCard key={signal.id} signal={signal} />
+            <BreakoutSignalCard key={signal.id} signal={signal} signalType="bearish" />
           ))}
         </div>
       )}
@@ -221,105 +223,5 @@ export default function IntradayBearishPage() {
         </Suspense>
       )}
     </div>
-  );
-}
-
-// Individual Signal Card Component
-function IntradayBearishCard({ signal }: { signal: IntradayBearishSignal }) {
-  const criteriaColor =
-    signal.criteria_met >= 5
-      ? "text-red-600 dark:text-red-400"
-      : signal.criteria_met >= 4
-      ? "text-orange-600 dark:text-orange-400"
-      : "text-yellow-600 dark:text-yellow-400";
-
-  return (
-    <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-red-500">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold">{signal.symbol}</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">NIFTY 250</p>
-          </div>
-          <Badge variant="destructive" className="text-xs">
-            <ArrowDownRight className="h-3 w-3 mr-1" />
-            BEARISH
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Criteria Met */}
-        <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
-          <span className="text-sm font-medium">Criteria Met</span>
-          <span className={`text-lg font-bold ${criteriaColor}`}>
-            {signal.criteria_met ?? "-"}/6
-          </span>
-        </div>
-
-        {/* Price Info */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-muted-foreground">Current Price</p>
-            <p className="font-semibold">₹{signal.current_price?.toFixed(2) || "N/A"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Opening</p>
-            <p className="font-semibold">₹{signal.opening_price?.toFixed(2) || "N/A"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Target</p>
-            <p className="font-semibold text-red-600">
-              ₹{signal.target_price?.toFixed(2) || "N/A"}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Stop Loss</p>
-            <p className="font-semibold text-green-600">
-              ₹{signal.stop_loss?.toFixed(2) || "N/A"}
-            </p>
-          </div>
-        </div>
-
-        {/* Technical Indicators */}
-        <div className="space-y-2 text-xs border-t pt-3">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Daily EMA20</span>
-            <span className="font-medium">
-              {signal.daily_ema20 ? `₹${signal.daily_ema20.toFixed(2)}` : "N/A"}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">5-min EMA20</span>
-            <span className="font-medium">
-              {signal.fivemin_ema20
-                ? `₹${signal.fivemin_ema20.toFixed(2)}`
-                : "N/A"}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">RSI</span>
-            <span className="font-medium">
-              {signal.rsi_value ? signal.rsi_value.toFixed(2) : "N/A"}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Volume Ratio</span>
-            <span className="font-medium">
-              {signal.volume_ratio
-                ? `${signal.volume_ratio.toFixed(2)}x`
-                : "N/A"}
-            </span>
-          </div>
-        </div>
-
-        {/* Confidence */}
-        <div className="flex items-center justify-between pt-2 border-t">
-          <span className="text-xs text-muted-foreground">Confidence</span>
-          <Badge variant="outline" className="text-xs">
-            {signal.probability ? (signal.probability * 100).toFixed(0) : "0"}%
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
