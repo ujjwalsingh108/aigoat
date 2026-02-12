@@ -234,7 +234,9 @@ class BseEquityScanner {
     // Check bullish breakout
     const bullishSignal = this.checkBullishBreakout({
       symbol,
+      instrumentToken: symbolData.instrument_token,
       currentPrice,
+      currentCandle,
       ema20,
       rsi,
       volatility,
@@ -246,7 +248,9 @@ class BseEquityScanner {
     // Check bearish breakdown
     const bearishSignal = this.checkBearishBreakdown({
       symbol,
+      instrumentToken: symbolData.instrument_token,
       currentPrice,
+      currentCandle,
       ema20,
       rsi,
       volatility,
@@ -257,7 +261,7 @@ class BseEquityScanner {
     return { bullish: bullishSignal, bearish: bearishSignal, historical, patterns };
   }
 
-  checkBullishBreakout({ symbol, currentPrice, ema20, rsi, volatility, volumeOk, patterns, historical }) {
+  checkBullishBreakout({ symbol, instrumentToken, currentPrice, currentCandle, ema20, rsi, volatility, volumeOk, patterns, historical }) {
     let criteriaMet = 0;
     const criteria = [];
 
@@ -298,6 +302,7 @@ class BseEquityScanner {
       
       return {
         symbol,
+        instrument_token: instrumentToken,
         signal_type: 'BULLISH_BREAKOUT',
         entry_price: currentPrice,
         ema20_5min: parseFloat(ema20.toFixed(2)),
@@ -309,6 +314,7 @@ class BseEquityScanner {
         pattern_confidence: patterns.strongest?.confidence || null,
         stop_loss: swingLow ? parseFloat(swingLow.toFixed(2)) : null,
         target_price: parseFloat((currentPrice * 1.05).toFixed(2)), // 5% target
+        candle_time: currentCandle.timestamp || currentCandle.time || new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
     }
@@ -316,7 +322,7 @@ class BseEquityScanner {
     return null;
   }
 
-  checkBearishBreakdown({ symbol, currentPrice, ema20, rsi, volatility, patterns, historical }) {
+  checkBearishBreakdown({ symbol, instrumentToken, currentPrice, currentCandle, ema20, rsi, volatility, patterns, historical }) {
     let criteriaMet = 0;
     const criteria = [];
 
@@ -345,6 +351,7 @@ class BseEquityScanner {
       
       return {
         symbol,
+        instrument_token: instrumentToken,
         signal_type: 'BEARISH_BREAKDOWN',
         entry_price: currentPrice,
         ema20_5min: parseFloat(ema20.toFixed(2)),
@@ -356,6 +363,7 @@ class BseEquityScanner {
         pattern_confidence: patterns.strongest?.confidence || null,
         stop_loss: swingHigh ? parseFloat(swingHigh.toFixed(2)) : null,
         target_price: parseFloat((currentPrice * 0.95).toFixed(2)), // 5% target
+        candle_time: currentCandle.timestamp || currentCandle.time || new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
     }
