@@ -208,14 +208,23 @@ class DatabaseClient {
    */
   async getDailyCandles(symbol, table, days = 20) {
     return this.queryWithRetry(async () => {
-      const { data, error } = await this.supabase
+      // For swing/daily tables (no 'time' column), select without time filter
+      // For intraday tables (with 'time' column), include time filter
+      const isSwingTable = table.includes('swing_hourly');
+      
+      let query = this.supabase
         .from(table)
-        .select("date, time, timestamp, open, high, low, close, volume")
-        .eq("symbol", symbol)
-        .in("time", ["15:30", "15:25", "15:20"]) // Market close candles (check multiple times for flexibility)
-        .order("timestamp", { ascending: false })
-        .limit(days);
+        .select(isSwingTable ? "date, timestamp, open, high, low, close, volume" : "date, time, timestamp, open, high, low, close, volume")
+        .eq("symbol", symbol);
+      
+      // Only filter by time for intraday tables
+      if (!isSwingTable) {
+        query = query.in("time", ["15:30", "15:25", "15:20"]); // Market close candles
+      }
+      
+      query = query.order("timestamp", { ascending: false }).limit(days);
 
+      const { data, error } = await query;
       if (error) throw error;
       return data ? data.reverse() : [];
     });
