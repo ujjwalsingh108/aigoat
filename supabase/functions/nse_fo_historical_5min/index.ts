@@ -8,15 +8,8 @@ const KITE_API_KEY = Deno.env.get("KITE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-interface KiteHistoricalCandle {
-  date: string; // "2024-01-15T09:15:00+0530"
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  oi?: number; // Open Interest for F&O
-}
+// Kite returns candles as arrays: [timestamp, open, high, low, close, volume, oi]
+type KiteHistoricalCandle = [string, number, number, number, number, number, number?];
 
 interface NseFoSymbol {
   symbol: string;
@@ -79,6 +72,7 @@ Deno.serve(async (req) => {
       .eq("is_active", true)
       .gte("expiry", new Date().toISOString().split('T')[0]) // Only non-expired
       .order("expiry", { ascending: true })
+      .order("strike", { ascending: true }) // ATM-nearest strikes first
       .limit(100); // Fetch up to 100 most recent contracts
 
     if (symbolsError) {
@@ -133,31 +127,48 @@ Deno.serve(async (req) => {
         }
 
         // Step 3: Transform and insert into historical_prices_nse_fo
-        const historicalRecords = candles.map((candle) => {
-          const timestamp = new Date(candle.date);
-          const dateOnly = timestamp.toISOString().split('T')[0];
-          const timeOnly = timestamp.toTimeString().slice(0, 5); // HH:MM
+        const historicalRecords = candles
+          .map((candle) => {
+            // Kite API returns: [timestamp, open, high, low, close, volume, oi]
+            const [dateStr, open, high, low, close, volume, oi] = candle;
+            const timestamp = new Date(dateStr);
+            
+            // Validate timestamp before proceeding
+            if (isNaN(timestamp.getTime())) {
+              console.warn(`⚠️ Invalid date for ${symbolData.symbol}: ${dateStr}`);
+              return null;
+            }
 
-          return {
-            symbol: symbolData.symbol,
-            instrument_token: symbolData.instrument_token,
-            underlying: symbolData.underlying,
-            instrument_type: symbolData.instrument_type,
-            expiry: symbolData.expiry,
-            strike: symbolData.strike,
-            option_type: symbolData.option_type,
-            date: dateOnly,
-            timestamp: timestamp.toISOString(),
-            interval_type: "5min",
-            time: timeOnly,
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-            volume: candle.volume,
-            open_interest: candle.oi || null,
-          };
-        });
+            const dateOnly = timestamp.toISOString().split('T')[0];
+            const timeOnly = timestamp.toTimeString().slice(0, 5); // HH:MM
+
+            return {
+              symbol: symbolData.symbol,
+              instrument_token: symbolData.instrument_token,
+              underlying: symbolData.underlying,
+              instrument_type: symbolData.instrument_type,
+              expiry: symbolData.expiry,
+              strike: symbolData.strike,
+              option_type: symbolData.option_type,
+              date: dateOnly,
+              timestamp: timestamp.toISOString(),
+              interval_type: "5min",
+              time: timeOnly,
+              open,
+              high,
+              low,
+              close,
+              volume,
+              open_interest: oi || null,
+            };
+          })
+          .filter((record) => record !== null); // Remove invalid records
+
+        // Skip if no valid records
+        if (historicalRecords.length === 0) {
+          console.log(`⚠️ No valid candles for ${symbolData.symbol} after filtering`);
+          continue;
+        }
 
         // Upsert into database (ignore conflicts on symbol + timestamp)
         const { error: insertError } = await supabase

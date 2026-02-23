@@ -29,7 +29,8 @@ const CONFIG = {
   // Signal generation
   MIN_CONFIDENCE_TO_SAVE: 0.6, // Bullish
   MIN_CRITERIA_MET: 4,
-  MIN_BEARISH_CONFIDENCE: 0.3, // Bearish
+  ENABLE_BEARISH_SIGNALS: false, // Disable bearish breakdown signals
+  MIN_BEARISH_CONFIDENCE: 0.3, // Bearish (disabled)
   MAX_BEARISH_CRITERIA: 2,
   
   // Cleanup
@@ -130,7 +131,8 @@ class BseEquityScanner {
             bullishSignals++;
           }
         }
-        if (bearish) {
+
+        if (bearish && CONFIG.ENABLE_BEARISH_SIGNALS) {
           let enrichedSignal = { ...bearish };
           
           try {

@@ -39,6 +39,17 @@ export default function Screener() {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
+        // Calculate 6 AM IST cutoff (IST = UTC + 5:30, so 6 AM IST = 00:30 UTC)
+        const now = new Date();
+        const todayAt6AMIST = new Date(now);
+        todayAt6AMIST.setUTCHours(0, 30, 0, 0); // 6 AM IST = 00:30 UTC
+        
+        // If current time is before 6 AM IST today, use yesterday's 6 AM IST
+        if (now < todayAt6AMIST) {
+          todayAt6AMIST.setDate(todayAt6AMIST.getDate() - 1);
+        }
+        const cutoffTime = todayAt6AMIST.toISOString();
+
         // Get NSE bullish count from last 15 minutes
         const { count: bullishTotal } = await supabase
           .from("bullish_breakout_nse_eq")
@@ -79,44 +90,32 @@ export default function Screener() {
           )
           .gte("probability", 0.6);
 
-        // Get BSE swing bullish count from last 15 minutes
+        // Get BSE swing bullish count since 6 AM IST (runs daily at 4:15pm)
         const { count: bseSwingBullish } = await supabase
-          .from("bullish_swing_bse_eq")
+          .from("bse_swing_positional_bullish")
           .select("*", { count: "exact", head: true })
-          .gte(
-            "created_at",
-            new Date(Date.now() - 15 * 60 * 1000).toISOString()
-          )
+          .gte("created_at", cutoffTime)
           .gte("probability", 0.6);
 
-        // Get BSE swing bearish count from last 15 minutes
+        // Get BSE swing bearish count since 6 AM IST (runs daily at 4:15pm)
         const { count: bseSwingBearish } = await supabase
-          .from("bearish_swing_bse_eq")
+          .from("bse_swing_positional_bearish")
           .select("*", { count: "exact", head: true })
-          .gte(
-            "created_at",
-            new Date(Date.now() - 15 * 60 * 1000).toISOString()
-          )
+          .gte("created_at", cutoffTime)
           .gte("probability", 0.3);
 
-        // Get NSE swing bullish count from last 15 minutes
+        // Get NSE swing bullish count since 6 AM IST (runs daily at 4pm)
         const { count: nseSwingBullish } = await supabase
           .from("nse_swing_positional_bullish")
           .select("*", { count: "exact", head: true })
-          .gte(
-            "created_at",
-            new Date(Date.now() - 15 * 60 * 1000).toISOString()
-          )
+          .gte("created_at", cutoffTime)
           .gte("probability", 0.7);
 
-        // Get NSE swing bearish count from last 15 minutes
+        // Get NSE swing bearish count since 6 AM IST (runs daily at 4pm)
         const { count: nseSwingBearish } = await supabase
           .from("nse_swing_positional_bearish")
           .select("*", { count: "exact", head: true })
-          .gte(
-            "created_at",
-            new Date(Date.now() - 15 * 60 * 1000).toISOString()
-          )
+          .gte("created_at", cutoffTime)
           .gte("probability", 0.7);
 
         setBullishCount(bullishTotal || 0);

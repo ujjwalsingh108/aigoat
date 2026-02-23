@@ -41,8 +41,19 @@ export default function SwingPositionalBearishPage() {
     try {
       setIsLoading(true);
 
-      // Use cached API route with longer timeframe for swing
-      const response = await fetch("/api/signals/swing-positional-bearish?minutesAgo=60&minProbability=0.7&limit=50");
+      // Calculate minutes since 6 AM IST (IST = UTC + 5:30, so 6 AM IST = 00:30 UTC)
+      const now = new Date();
+      const todayAt6AMIST = new Date(now);
+      todayAt6AMIST.setUTCHours(0, 30, 0, 0);
+      
+      if (now < todayAt6AMIST) {
+        todayAt6AMIST.setDate(todayAt6AMIST.getDate() - 1);
+      }
+      
+      const minutesSince6AM = Math.floor((now.getTime() - todayAt6AMIST.getTime()) / (60 * 1000));
+
+      // Use cached API route with minutes since 6 AM IST (scanner runs daily at 4pm)
+      const response = await fetch(`/api/signals/swing-positional-bearish?minutesAgo=${minutesSince6AM}&minProbability=0.7&limit=50`);
       const result = await response.json();
 
       if (!result.success) {

@@ -62,17 +62,40 @@ class DatabaseClient {
   /**
    * Get NSE F&O symbols (NIFTY only, active PE/CE near ATM)
    */
-  async getNseFoSymbols(underlying = 'NIFTY', limit = 50) {
+  async getNseFoSymbols(underlying = 'NIFTY', limit = 1000) {
     return this.queryWithRetry(async () => {
+      // Get symbols that have historical data (excluding symbols with 0 candles)
+      const { data: symbolsWithData, error: histError } = await this.supabase
+        .from('historical_prices_nse_fo')
+        .select('symbol')
+        .eq('underlying', underlying);
+
+      if (histError) throw histError;
+
+      // Extract unique symbols that have data
+      const symbolsSet = new Set((symbolsWithData || []).map(row => row.symbol));
+      const symbolsArray = Array.from(symbolsSet);
+
+      if (symbolsArray.length === 0) {
+        console.warn('⚠️ No historical data found for NSE F&O symbols');
+        return [];
+      }
+
+      console.log(`📊 Found ${symbolsArray.length} unique symbols with historical data`);
+
+      // Fetch symbol metadata for symbols that have historical data
+      // Order by expiry (nearest first), then strike (ATM-nearest first)
       const { data, error } = await this.supabase
         .from('nse_fo_symbols')
         .select("symbol, instrument_token, exchange, segment, underlying, instrument_type, expiry, strike, option_type")
         .eq("is_active", true)
         .eq("underlying", underlying)
         .in("option_type", ["CE", "PE"])
-        .gte("expiry", new Date().toISOString().split('T')[0]) // Active contracts only
+        .in("symbol", symbolsArray)
+        .gte("expiry", new Date().toISOString().split('T')[0])
         .order("expiry", { ascending: true })
-        .limit(limit);
+        .order("strike", { ascending: true })
+        .limit(Math.min(limit, symbolsArray.length)); // Use actual count or limit, whichever is smaller
 
       if (error) throw error;
       return data || [];
@@ -222,11 +245,36 @@ class DatabaseClient {
         query = query.in("time", ["15:30", "15:25", "15:20"]); // Market close candles
       }
       
-      query = query.order("timestamp", { ascending: false }).limit(days);
+      // For swing_hourly, fetch 7x records (7 hourly candles per day) and extract EOD
+      const recordsToFetch = isSwingTable ? days * 10 : days; // 10x for safety (some days may have fewer candles)
+      query = query.order("timestamp", { ascending: false }).limit(recordsToFetch);
 
       const { data, error } = await query;
       if (error) throw error;
-      return data ? data.reverse() : [];
+      
+      if (!data || data.length === 0) return [];
+      
+      // For swing_hourly tables, extract only EOD (last hourly candle of each day)
+      if (isSwingTable) {
+        const dailyCandles = new Map();
+        
+        // Group by date and keep the latest timestamp (EOD candle)
+        data.forEach(candle => {
+          const date = candle.date;
+          const existing = dailyCandles.get(date);
+          
+          if (!existing || new Date(candle.timestamp) > new Date(existing.timestamp)) {
+            dailyCandles.set(date, candle);
+          }
+        });
+        
+        // Convert to array and sort by date ascending
+        return Array.from(dailyCandles.values())
+          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+          .slice(-days); // Take only requested number of days
+      }
+      
+      return data.reverse();
     });
   }
 

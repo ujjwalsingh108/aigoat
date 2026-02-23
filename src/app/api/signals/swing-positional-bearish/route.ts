@@ -14,14 +14,16 @@ export const runtime = "nodejs";
  * GET /api/signals/swing-positional-bearish
  * 
  * Query params:
- * - minutesAgo: number (default: 60) - Get signals from last N minutes (longer for swing)
+ * - minutesAgo: number (default: 1440 = 24 hours, but frontend calculates since 6 AM IST)
  * - minProbability: number (default: 0.7) - Minimum confidence threshold (higher for swing)
  * - limit: number (default: 50) - Max results
+ * 
+ * Note: Swing scanners run daily at 4:00 PM IST. Frontend should calculate minutes since 6 AM IST.
  */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const minutesAgo = parseInt(searchParams.get("minutesAgo") || "60");
+    const minutesAgo = parseInt(searchParams.get("minutesAgo") || "1440");
     const minProbability = parseFloat(searchParams.get("minProbability") || "0.7");
     const limit = parseInt(searchParams.get("limit") || "50");
 

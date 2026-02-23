@@ -159,12 +159,12 @@ class BseSwingPositionalScanner {
   async analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch daily candles with cache (365 days for volume + 50 for SMA)
-    const cacheKey = `bse_swing_daily_${symbol}_365`;
+    // Fetch daily candles with cache (60 days to ensure 50+ for SMA50)
+    const cacheKey = `bse_swing_daily_${symbol}_60`;
     let dailyCandles = cache.get(cacheKey);
     
     if (!dailyCandles) {
-      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_bse_swing_hourly', 20);
+      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_bse_swing_hourly', 60);
       // Cache for 23 hours (refreshes before next daily scan)
       cache.set(cacheKey, dailyCandles, 82800);
     }

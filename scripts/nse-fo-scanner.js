@@ -19,7 +19,7 @@ const CONFIG = {
 
   // Scanner settings
   SCAN_INTERVAL_MS: parseInt(process.env.SCAN_INTERVAL_MS) || 60000, // 60 seconds
-  SYMBOLS_LIMIT: 50, // Top 50 most liquid NIFTY options (ATM ±5 strikes)
+  SYMBOLS_LIMIT: 500, // Analyze all symbols with historical data (currently filtered to ~100 by historical_5min function)
   
   // Technical analysis (5-min timeframe for F&O)
   EMA_PERIOD: 20,
@@ -83,12 +83,21 @@ class NseFoScanner {
   async scanAllSymbols() {
     const startTime = Date.now();
     let totalSignals = 0;
+    let analyzedCount = 0;
+    let skippedCount = 0;
 
     console.log(`\n🔍 Starting NSE F&O scan at ${new Date().toLocaleTimeString()}...`);
+    console.log(`📊 Analyzing ${this.symbols.length} symbols...`);
 
     for (const symbolData of this.symbols) {
       try {
         const signal = await this.analyzeSymbol(symbolData);
+        
+        if (signal === null) {
+          skippedCount++;
+        } else {
+          analyzedCount++;
+        }
         
         if (signal) {
           // AI validation for F&O signals
@@ -103,7 +112,8 @@ class NseFoScanner {
               ai_verdict: aiResult.verdict,
               ai_confidence: aiResult.confidence,
               ai_reasoning: aiResult.reasoning,
-              ai_risk_factors: JSON.stringify(aiResult.risk_factors),
+              ai_risk_factors: aiResult.risk_factors || null,
+              ai_validated: true,
             };
             
             await this.db.saveNseFoSignal(enrichedSignal);
@@ -120,7 +130,7 @@ class NseFoScanner {
     const duration = Date.now() - startTime;
     
     this.monitor.recordScan(duration, totalSignals);
-    console.log(`✅ Scan complete: ${totalSignals} signals | ${duration}ms`);
+    console.log(`✅ Scan complete: ${totalSignals} signals | ${analyzedCount} analyzed | ${skippedCount} skipped | ${duration}ms`);
   }
 
   async analyzeSymbol(symbolData) {
@@ -137,6 +147,8 @@ class NseFoScanner {
     }
 
     if (historical.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
+      // Log all skips temporarily for debugging
+      console.log(`⚠️ ${symbol}: Only ${historical.length} candles (need ${CONFIG.MIN_CANDLES_FOR_ANALYSIS})`);
       return null;
     }
 
@@ -175,8 +187,15 @@ class NseFoScanner {
     });
 
     if (!breakoutSignal) {
+      // Occasionally log why signals aren't generated (1% sample)
+      if (Math.random() < 0.01) {
+        console.log(`⏭️ ${symbol}: No signal (Price: ${currentPrice}, EMA20: ${ema20.toFixed(2)}, RSI: ${rsi.toFixed(1)}, Vol: ${volumeRatio.toFixed(1)}x)`);
+      }
       return null;
     }
+
+    // Log when a potential signal is found (before AI validation)
+    console.log(`🎯 ${symbol}: Potential signal found! (${breakoutSignal.signal_type}, ${breakoutSignal.criteria_met}/5 criteria, ${(breakoutSignal.probability*100).toFixed(0)}% confidence)`);
 
     return {
       data: breakoutSignal,
@@ -286,8 +305,10 @@ class NseFoScanner {
         stop_loss: stopLoss,
         probability: parseFloat(confidence.toFixed(2)),
         criteria_met: criteriaMet,
+        pattern: patterns.strongest?.name || null,
         is_active: true,
         created_at: new Date().toISOString(),
+        ai_validated: false,
       };
     }
 

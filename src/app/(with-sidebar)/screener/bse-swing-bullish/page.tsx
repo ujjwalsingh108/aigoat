@@ -40,30 +40,37 @@ export default function BSESwingBullishPage() {
     try {
       setIsLoading(true);
 
+      // Calculate cutoff time: 6 AM IST (IST = UTC + 5:30, so 6 AM IST = 00:30 UTC)
+      const now = new Date();
+      const todayAt6AMIST = new Date(now);
+      todayAt6AMIST.setUTCHours(0, 30, 0, 0);
+      
+      if (now < todayAt6AMIST) {
+        todayAt6AMIST.setDate(todayAt6AMIST.getDate() - 1);
+      }
+
       const { data, error } = await supabase
-        .from("bullish_swing_bse_eq")
+        .from("bse_swing_positional_bullish")
         .select("*")
-        .eq("is_active", true)
-        .gte(
-          "created_at",
-          new Date(Date.now() - 15 * 60 * 1000).toISOString()
-        )
+        .gte("created_at", todayAt6AMIST.toISOString())
         .gte("probability", 0.6)
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) {
         console.error("Error loading BSE swing bullish signals:", error);
+        setSignals([]);
       } else {
         setSignals(data || []);
         setLastUpdate(new Date());
       }
     } catch (err) {
       console.error("Exception loading BSE swing bullish signals:", err);
+      setSignals([]);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   // Initial load
   useEffect(() => {

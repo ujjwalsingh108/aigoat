@@ -167,7 +167,7 @@ export function PatternDisplay({ signal }: PatternDisplayProps) {
         </div>
 
         {/* Additional Patterns (if confluence) */}
-        {patterns.confluence && patterns.detected.length > 1 && (
+        {patterns.confluence && patterns.detected && patterns.detected.length > 1 && (
           <details className="text-xs">
             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
               View all {patterns.total_patterns} patterns

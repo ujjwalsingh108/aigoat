@@ -25,7 +25,8 @@ interface KiteInstrument {
 }
 
 /**
- * Fetch the latest valid Kite access token from database
+ * Fetches the Kite access token from the kite_tokens table
+ * Returns the most recent non-expired token
  */
 async function getKiteAccessToken(supabase: any): Promise<string> {
   const { data, error } = await supabase
@@ -36,7 +37,7 @@ async function getKiteAccessToken(supabase: any): Promise<string> {
     .single();
 
   if (error || !data) {
-    throw new Error(`Failed to fetch Kite token: ${error?.message || "No token found"}`);
+    throw new Error(`Failed to fetch Kite access token: ${error?.message || "No token found"}`);
   }
 
   // Check if token is expired
@@ -44,10 +45,10 @@ async function getKiteAccessToken(supabase: any): Promise<string> {
   const now = new Date();
   
   if (now >= expiresAt) {
-    throw new Error(`Kite token expired at ${expiresAt.toISOString()}`);
+    throw new Error("Kite access token has expired. Please refresh the token.");
   }
 
-  console.log(`✅ Using Kite token (valid until ${expiresAt.toISOString()})`);
+  console.log(`✅ Using Kite access token (expires: ${expiresAt.toISOString()})`);
   return data.access_token;
 }
 
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // Fetch latest Kite access token from database
+    // Fetch Kite access token from database
     const KITE_ACCESS_TOKEN = await getKiteAccessToken(supabase);
 
     // Step 1: Fetch all instruments from Kite API
