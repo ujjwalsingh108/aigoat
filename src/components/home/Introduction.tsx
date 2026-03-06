@@ -123,34 +123,34 @@ export default function Introduction() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <FeatureCard
             title="Technical Analysis"
             description="Analyze any ticker instantly with one click"
             imageSrc="/images/stock.jpg"
             icon={PieChart}
-            iconClassName="text-blue-400 w-5 h-5"
+            gradient="from-blue-500 via-blue-600 to-indigo-700"
           />
           <FeatureCard
             title="Price Prediction"
             description="See the next move and stay ahead in the market"
             imageSrc="/images/stock.jpg"
             icon={TrendingUp}
-            iconClassName="text-green-400 w-5 h-5"
+            gradient="from-emerald-500 via-green-600 to-teal-700"
           />
           <FeatureCard
             title="Should I buy"
             description="AI-driven insights for your stocks, crypto, or ETFs"
             imageSrc="/images/stock.jpg"
             icon={Sparkles}
-            iconClassName="text-cyan-400 w-5 h-5"
+            gradient="from-cyan-500 via-cyan-600 to-sky-700"
           />
           <FeatureCard
             title="Option Strategy Builder"
             description="Build a smart profit plan for any market move"
             imageSrc="/images/stock.jpg"
             icon={BarChart2}
-            iconClassName="text-purple-400 w-5 h-5"
+            gradient="from-violet-500 via-purple-600 to-purple-800"
           />
         </div>
         <style>{`

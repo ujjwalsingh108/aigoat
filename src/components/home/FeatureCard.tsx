@@ -2,7 +2,7 @@
 import React from "react";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, ArrowRight } from "lucide-react";
 
 interface FeatureCardProps {
   title: string;
@@ -10,6 +10,7 @@ interface FeatureCardProps {
   imageSrc: string;
   icon?: LucideIcon;
   iconClassName?: string;
+  gradient?: string;
 }
 
 export const FeatureCard: React.FC<FeatureCardProps> = ({
@@ -18,31 +19,50 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
   imageSrc,
   icon: Icon,
   iconClassName = "",
+  gradient = "from-indigo-500 via-blue-600 to-blue-700",
 }) => (
-  <Card className="@container/card relative overflow-hidden transition-all duration-500 shadow-lg hover:shadow-xl hover:scale-[1.03] active:scale-[0.98] bg-gradient-to-tr from-gray-50 to-transparent dark:bg-none cursor-pointer touch-manipulation">
-    <div className="px-2 sm:px-3 py-2 relative">
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        {Icon && <Icon className={`${iconClassName} w-4 h-4 sm:w-5 sm:h-5`} />}
-        <span className="font-semibold text-xs sm:text-sm dark:text-white text-black">
-          {title}
-        </span>
-      </div>
+  <Card className="group relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl active:scale-[0.99] border-0 touch-manipulation min-h-[9rem] sm:min-h-[10rem] md:min-h-[11rem]">
+    {/* Gradient background */}
+    <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+    {/* Subtle dark overlay at bottom for text contrast */}
+    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+    {/* Hover shimmer */}
+    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/8 transition-colors duration-300" />
+
+    {/* Image — decorative, right-aligned, faded into bg */}
+    <div className="absolute right-0 top-0 bottom-0 w-2/5 sm:w-1/2 overflow-hidden opacity-20 group-hover:opacity-30 transition-opacity duration-300">
+      <Image
+        src={imageSrc}
+        alt=""
+        fill
+        className="object-cover object-left"
+        aria-hidden
+      />
     </div>
-    <div className="flex items-center px-2 sm:px-3 pb-2 relative gap-2 mt-[-10px]">
-      <div className="z-10 flex-1">
-        <p className="text-[10px] sm:text-xs dark:text-gray-300 text-gray-700 line-clamp-2">
+
+    <div className="relative z-10 flex flex-col justify-between h-full p-4 sm:p-5 text-white">
+      {/* Top: icon + title */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          {Icon && (
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm border border-white/25">
+              <Icon className="w-4 h-4 text-white" />
+            </span>
+          )}
+          <span className="font-bold text-sm sm:text-base leading-tight drop-shadow">
+            {title}
+          </span>
+        </div>
+        <p className="text-white/80 text-xs sm:text-sm leading-snug line-clamp-2 max-w-[65%]">
           {description}
         </p>
       </div>
-      <div className="z-0 flex-shrink-0">
-        <Image
-          src={imageSrc}
-          alt={title + " image"}
-          width={96}
-          height={96}
-          className="opacity-90 object-cover w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24"
-          priority
-        />
+
+      {/* Bottom: CTA arrow */}
+      <div className="flex justify-end mt-3">
+        <span className="flex items-center justify-center w-7 h-7 rounded-full bg-white/20 border border-white/30 group-hover:bg-white/30 group-hover:scale-110 transition-all duration-200">
+          <ArrowRight className="w-3.5 h-3.5 text-white" />
+        </span>
       </div>
     </div>
   </Card>
