@@ -1,9 +1,9 @@
 require("dotenv").config();
-const { DatabaseClient } = require("./utils/database-client");
-const { TechnicalIndicators } = require("./utils/indicators");
-const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
+const { DatabaseClient } = require("../utils/database-client");
+const { TechnicalIndicators } = require("../utils/indicators");
+const { ScannerMonitor, MarketHoursChecker } = require("../utils/monitor");
 const { PatternDetector } = require("./pattern-detector");
-const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
+const { AiBreakoutFilter } = require("../utils/ai-breakout-filter");
 const cache = require("./memory-cache");
 
 // =================================================================
@@ -17,7 +17,7 @@ const CONFIG = {
   
   // Scanner settings (runs once daily after market close)
   SCAN_TIME_HOUR: 16, // 4 PM IST (after market close at 3:30 PM)
-  SCAN_TIME_MINUTE: 15, // 15 minutes after NSE scan
+  SCAN_TIME_MINUTE: 0,
   SYMBOLS_LIMIT: 1000, // Top 1000 by market cap
   
   // Technical analysis (DAILY timeframe)
@@ -45,13 +45,13 @@ const CONFIG = {
 };
 
 // =================================================================
-// 📊 BSE SWING POSITIONAL SCANNER (DAILY BATCH)
+// 📊 NSE SWING POSITIONAL SCANNER (DAILY BATCH)
 // =================================================================
 
-class BseSwingPositionalScanner {
+class NseSwingPositionalScanner {
   constructor() {
     this.db = new DatabaseClient(CONFIG);
-    this.monitor = new ScannerMonitor('BSE_SWING_POSITIONAL');
+    this.monitor = new ScannerMonitor('NSE_SWING_POSITIONAL');
     this.patternDetector = new PatternDetector();
     this.aiFilter = new AiBreakoutFilter();
     this.symbols = [];
@@ -61,7 +61,7 @@ class BseSwingPositionalScanner {
   }
 
   async initialize() {
-    console.log("🚀 Initializing BSE Swing Positional Scanner (Daily Batch)...");
+    console.log("🚀 Initializing NSE Swing Positional Scanner (Daily Batch)...");
     console.log(`📊 Configuration:
       - Scan Time: ${CONFIG.SCAN_TIME_HOUR}:${CONFIG.SCAN_TIME_MINUTE.toString().padStart(2, '0')} IST daily
       - Symbols Limit: ${CONFIG.SYMBOLS_LIMIT}
@@ -70,14 +70,14 @@ class BseSwingPositionalScanner {
     `);
 
     try {
-      // Get top 1000 BSE stocks by market cap
-      this.symbols = await this.db.getEquitySymbols('BSE', CONFIG.SYMBOLS_LIMIT);
+      // Get top 1000 NSE stocks by market cap
+      this.symbols = await this.db.getEquitySymbols('NSE', CONFIG.SYMBOLS_LIMIT);
       
       if (this.symbols.length === 0) {
-        throw new Error("No BSE symbols loaded");
+        throw new Error("No NSE symbols loaded");
       }
 
-      console.log(`✅ Loaded ${this.symbols.length} BSE equity symbols`);
+      console.log(`✅ Loaded ${this.symbols.length} NSE equity symbols`);
       console.log(`📊 Sample: ${this.symbols.slice(0, 5).map(s => s.symbol).join(', ')}`);
       
       return true;
@@ -92,13 +92,13 @@ class BseSwingPositionalScanner {
     const bullishBatch = [];
     const bearishBatch = [];
 
-    console.log(`\n🔍 Starting BSE Swing Positional scan at ${new Date().toLocaleTimeString()}...`);
+    console.log(`\n🔍 Starting NSE Swing Positional scan at ${new Date().toLocaleTimeString()}...`);
 
     // ── BULK PRE-FETCH: 1000 symbols → 2 DB queries total ─────────────────────
     const symbolList = this.symbols.map(s => s.symbol);
-    console.log(`📦 Bulk-fetching daily candles for ${symbolList.length} BSE swing symbols...`);
+    console.log(`📦 Bulk-fetching daily candles for ${symbolList.length} NSE swing symbols...`);
     this._bulkDaily = await this.db.getBulkDailyCandles(
-      symbolList, 'historical_prices_bse_swing_hourly', 65 // 65 days → enough for EMA20 + SMA50
+      symbolList, 'historical_prices_nse_swing_hourly', 65 // 65 days → enough for EMA20 + SMA50
     );
     console.log(`✅ Bulk fetch done: ${this._bulkDaily.size} symbols with data`);
     // ──────────────────────────────────────────────────────────────────────────
@@ -108,6 +108,7 @@ class BseSwingPositionalScanner {
         const result = this.analyzeSymbol(symbolData); // pure in-memory, no await needed
         
         if (result.bullish) {
+          // AI validation for bullish swing signals
           const aiResult = await this.aiFilter.validateBreakout(result.bullish, { 
             patterns: result.patterns, 
             historicalCandles: result.dailyCandles 
@@ -151,10 +152,10 @@ class BseSwingPositionalScanner {
 
     // ── BATCH SAVE: all signals in 1-2 DB round-trips ─────────────────────────
     if (bullishBatch.length > 0) {
-      await this.db.saveBulkSignals(bullishBatch, 'bse_swing_positional_bullish');
+      await this.db.saveBulkSignals(bullishBatch, 'nse_swing_positional_bullish');
     }
     if (bearishBatch.length > 0) {
-      await this.db.saveBulkSignals(bearishBatch, 'bse_swing_positional_bearish');
+      await this.db.saveBulkSignals(bearishBatch, 'nse_swing_positional_bearish');
     }
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ class BseSwingPositionalScanner {
     const totalSignals = bullishBatch.length + bearishBatch.length;
     
     this.monitor.recordScan(duration, totalSignals);
-    console.log(`✅ BSE swing scan complete: ${bullishBatch.length} bullish, ${bearishBatch.length} bearish | ${duration}ms`);
+    console.log(`✅ Swing scan complete: ${bullishBatch.length} bullish, ${bearishBatch.length} bearish | ${duration}ms`);
     this.aiFilter.logStats();
   }
 
@@ -388,9 +389,9 @@ class BseSwingPositionalScanner {
       const ttlMs = CONFIG.SIGNAL_TTL_DAYS * 24 * 60 * 60 * 1000;
       const ttlMinutes = CONFIG.SIGNAL_TTL_DAYS * 24 * 60;
       
-      await this.db.cleanupStaleSignals('bse_swing_positional_bullish', ttlMinutes);
-      await this.db.cleanupStaleSignals('bse_swing_positional_bearish', ttlMinutes);
-      console.log(`🧹 Cleaned up BSE swing signals older than ${CONFIG.SIGNAL_TTL_DAYS} days`);
+      await this.db.cleanupStaleSignals('nse_swing_positional_bullish', ttlMinutes);
+      await this.db.cleanupStaleSignals('nse_swing_positional_bearish', ttlMinutes);
+      console.log(`🧹 Cleaned up swing signals older than ${CONFIG.SIGNAL_TTL_DAYS} days`);
     } catch (error) {
       console.error('❌ Cleanup failed:', error.message);
     }
@@ -400,7 +401,7 @@ class BseSwingPositionalScanner {
     const now = new Date();
     const nextScan = new Date(now);
     
-    // Set to configured scan time (e.g., 4:15 PM)
+    // Set to configured scan time (e.g., 4 PM)
     nextScan.setHours(CONFIG.SCAN_TIME_HOUR, CONFIG.SCAN_TIME_MINUTE, 0, 0);
     
     // If past today's scan time, schedule for tomorrow
@@ -423,7 +424,7 @@ class BseSwingPositionalScanner {
     const nextScan = this.getNextScanTime();
     const delay = nextScan.getTime() - Date.now();
     
-    console.log(`⏰ Next BSE swing scan scheduled for: ${nextScan.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+    console.log(`⏰ Next swing scan scheduled for: ${nextScan.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
     
     this.dailyScanTimer = setTimeout(async () => {
       await this.scanAllSymbols();
@@ -435,7 +436,7 @@ class BseSwingPositionalScanner {
   }
 
   async start() {
-    console.log("🚀 Starting BSE Swing Positional Scanner (Daily Batch Mode)...");
+    console.log("🚀 Starting NSE Swing Positional Scanner (Daily Batch Mode)...");
 
     const initialized = await this.initialize();
     if (!initialized) {
@@ -470,7 +471,7 @@ class BseSwingPositionalScanner {
 
   stop() {
     if (this.dailyScanTimer) clearTimeout(this.dailyScanTimer);
-    console.log("⏹️ BSE Swing Positional Scanner stopped.");
+    console.log("⏹️ NSE Swing Positional Scanner stopped.");
   }
 }
 
@@ -478,7 +479,7 @@ class BseSwingPositionalScanner {
 // 🎬 MAIN EXECUTION
 // =================================================================
 
-const scanner = new BseSwingPositionalScanner();
+const scanner = new NseSwingPositionalScanner();
 
 scanner.start().catch((error) => {
   console.error("❌ Fatal error:", error);
@@ -487,13 +488,13 @@ scanner.start().catch((error) => {
 
 // Graceful shutdown
 process.on("SIGINT", () => {
-  console.log("\n⏹️ Shutting down BSE Swing Positional Scanner...");
+  console.log("\n⏹️ Shutting down NSE Swing Positional Scanner...");
   scanner.stop();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-  console.log("\n⏹️ Shutting down BSE Swing Positional Scanner...");
+  console.log("\n⏹️ Shutting down NSE Swing Positional Scanner...");
   scanner.stop();
   process.exit(0);
 });

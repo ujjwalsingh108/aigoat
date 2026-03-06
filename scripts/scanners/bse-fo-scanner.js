@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { createClient } = require("@supabase/supabase-js");
-const { PatternDetector } = require("./pattern-detector");
-const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
+const { PatternDetector } = require("../utils/pattern-detector");
+const { AiBreakoutFilter } = require("../utils/ai-breakout-filter");
 
 // =================================================================
 // 🔧 CONFIGURATION

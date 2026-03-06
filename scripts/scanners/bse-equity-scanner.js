@@ -1,10 +1,10 @@
 require("dotenv").config();
-const { DatabaseClient } = require("./utils/database-client");
-const { TechnicalIndicators } = require("./utils/indicators");
-const { ScannerMonitor, MarketHoursChecker } = require("./utils/monitor");
-const { PatternDetector } = require("./pattern-detector");
-const { AiBreakoutFilter } = require("./utils/ai-breakout-filter");
-const cache = require("./memory-cache");
+const { DatabaseClient } = require("../utils/database-client");
+const { TechnicalIndicators } = require("../utils/indicators");
+const { ScannerMonitor, MarketHoursChecker } = require("../utils/monitor");
+const { PatternDetector } = require("../utils/pattern-detector");
+const { AiBreakoutFilter } = require("../utils/ai-breakout-filter");
+const cache = require("../utils/memory-cache");
 
 // =================================================================
 // 🔧 CONFIGURATION

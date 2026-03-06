@@ -1,5 +1,5 @@
 {
-  "name": "breakout-scanner",
+  "name": "aigoat-breakout-prediction-application",
   "version": "1.0.0",
   "description": "Real-time breakout prediction scanner for NIFTY stocks using 6-criteria technical analysis",
   "main": "breakout-scanner.js",
