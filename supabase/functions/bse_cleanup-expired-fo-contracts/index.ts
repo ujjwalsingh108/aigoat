@@ -1,4 +1,4 @@
-// NSE Cleanup Expired F&O Contracts Edge Function
+// BSE Cleanup Expired F&O Contracts Edge Function
 // Marks expired contracts as inactive and deletes very old ones
 // Run daily via cron to keep the database clean
 
@@ -163,7 +163,7 @@ async function cleanupTable(
 
 Deno.serve(async (req) => {
   try {
-    console.log("🚀 Starting NSE F&O contracts cleanup...");
+    console.log("🚀 Starting BSE F&O contracts cleanup...");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
@@ -173,14 +173,14 @@ Deno.serve(async (req) => {
 
     const results: CleanupResult[] = [];
 
-    // Cleanup NSE F&O symbols
+    // Cleanup BSE F&O symbols
     try {
-      const nseResult = await cleanupTable(supabase, "nse_fo_symbols", today, 90);
-      results.push(nseResult);
+      const bseResult = await cleanupTable(supabase, "bse_fo_symbols", today, 90);
+      results.push(bseResult);
     } catch (error: any) {
-      console.error("❌ Error cleaning NSE F&O:", error.message);
+      console.error("❌ Error cleaning BSE F&O:", error.message);
       results.push({
-        table: "nse_fo_symbols",
+        table: "bse_fo_symbols",
         totalContracts: 0,
         expiredActive: 0,
         markedInactive: 0,
@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
     const totalDeleted = results.reduce((sum, r) => sum + r.deletedOld, 0);
 
     console.log("\n╔══════════════════════════════════════════════════════════╗");
-    console.log("║              NSE CLEANUP SUMMARY                         ║");
+    console.log("║              BSE CLEANUP SUMMARY                         ║");
     console.log("╚══════════════════════════════════════════════════════════╝");
     console.log(`✅ Expired contracts found: ${totalExpiredFound}`);
     console.log(`✅ Marked as inactive: ${totalMarkedInactive}`);
@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: "NSE F&O contracts cleanup completed",
+        message: "BSE F&O contracts cleanup completed",
         date: today,
         summary: {
           expired_found: totalExpiredFound,

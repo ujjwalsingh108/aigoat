@@ -29,6 +29,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 interface KiteTokenData {
+  id: number;
   access_token: string;
   created_at: string;
   expires_at: string;
@@ -143,7 +144,8 @@ async function authenticateKite(): Promise<string> {
 
 /**
  * Save access token to Supabase
- * Kite tokens expire at 6 AM next day
+ * Kite tokens expire at 3 AM IST next day.
+ * Always upserts into id=1 — only one row ever exists.
  */
 async function saveTokenToSupabase(accessToken: string): Promise<boolean> {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -152,28 +154,34 @@ async function saveTokenToSupabase(accessToken: string): Promise<boolean> {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // Calculate expiry (6 AM next day)
+  // Calculate expiry: next day 3:00 AM IST (UTC+5:30)
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(6, 0, 0, 0);
+  const todayIst = new Date(now.getTime() + IST_OFFSET_MS);
+  const expiryIst = new Date(todayIst);
+  expiryIst.setDate(expiryIst.getDate() + 1);
+  expiryIst.setHours(3, 0, 0, 0); // 3:00 AM IST
+  const expiresAt = new Date(expiryIst.getTime() - IST_OFFSET_MS); // back to UTC
 
-  // Save to database
+  // Single row — always id=1
   const data: KiteTokenData = {
+    id: 1,
     access_token: accessToken,
     created_at: now.toISOString(),
-    expires_at: tomorrow.toISOString(),
+    expires_at: expiresAt.toISOString(),
   };
 
   try {
-    const { error } = await supabase.from("kite_tokens").insert(data);
+    const { error } = await supabase
+      .from("kite_tokens")
+      .upsert(data, { onConflict: "id" });
 
     if (error) {
       throw error;
     }
 
-    console.log("✓ Token saved to Supabase");
-    console.log(`✓ Valid until: ${tomorrow.toLocaleString()}`);
+    console.log("✓ Token saved to Supabase (id=1 upserted)");
+    console.log(`✓ Valid until: ${expiresAt.toLocaleString()} UTC (3:00 AM IST)`);
     return true;
   } catch (error) {
     console.error("✗ Error saving to Supabase:", error);
@@ -243,7 +251,7 @@ async function main() {
     console.log("=".repeat(70));
     console.log("\nNext steps:");
     console.log("1. The Edge Function can now fetch data using this token");
-    console.log("2. This token is valid until 6 AM tomorrow");
+    console.log("2. This token is valid until 3 AM IST tomorrow");
     console.log("3. Run this script again tomorrow to refresh the token");
     console.log("\nTo automate this process, you can:");
     console.log("- Set up a cron job to run this script daily");

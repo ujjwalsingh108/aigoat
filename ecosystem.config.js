@@ -20,9 +20,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: "1G",
-      restart_delay: 5000,
-      max_restarts: 10,
-      min_uptime: "30s",
+      restart_delay: 30000,  // 30 seconds between restarts (was 5s)
+      max_restarts: 5,        // Max 5 restarts then give up (was 10)
+      min_uptime: "60s",
       env: {
         NODE_ENV: "production",
         SCANNER_NAME: "NSE_EQUITY",
@@ -40,9 +40,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: "1G",
-      restart_delay: 5000,
-      max_restarts: 10,
-      min_uptime: "30s",
+      restart_delay: 30000,  // 30 seconds between restarts (was 5s)
+      max_restarts: 5,        // Max 5 restarts then give up (was 10)
+      min_uptime: "60s",
       env: {
         NODE_ENV: "production",
         SCANNER_NAME: "BSE_EQUITY",
@@ -60,9 +60,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: "800M",
-      restart_delay: 5000,
-      max_restarts: 10,
-      min_uptime: "30s",
+      restart_delay: 30000,  // 30 seconds between restarts (was 5s)
+      max_restarts: 5,
+      min_uptime: "60s",
       env: {
         NODE_ENV: "production",
         SCANNER_NAME: "NSE_FO",
@@ -80,9 +80,9 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: "800M",
-      restart_delay: 5000,
-      max_restarts: 10,
-      min_uptime: "30s",
+      restart_delay: 30000,  // 30 seconds between restarts (was 5s)
+      max_restarts: 5,
+      min_uptime: "60s",
       env: {
         NODE_ENV: "production",
         SCANNER_NAME: "BSE_FO",

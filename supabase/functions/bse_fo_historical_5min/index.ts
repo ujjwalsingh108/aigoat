@@ -64,46 +64,64 @@ Deno.serve(async (req) => {
     const KITE_ACCESS_TOKEN = await getKiteAccessToken(supabase);
 
     // Step 1: Get active SENSEX PE/CE contracts from bse_fo_symbols
-    const { data: symbols, error: symbolsError } = await supabase
+    // NOTE: is_active is intentionally excluded — on expiry day contracts get
+    // marked inactive while still tradeable. The gte(expiry, today) filter is
+    // the authoritative boundary.
+    const today = new Date().toISOString().split('T')[0];
+    let { data: symbols, error: symbolsError } = await supabase
       .from("bse_fo_symbols")
       .select("symbol, instrument_token, underlying, instrument_type, expiry, strike, option_type")
       .eq("underlying", "SENSEX")
       .in("option_type", ["PE", "CE"])
-      .eq("is_active", true)
-      .gte("expiry", new Date().toISOString().split('T')[0]) // Only non-expired
+      .gte("expiry", today) // Only non-expired (>= today handles expiry-day contracts)
       .order("expiry", { ascending: true })
-      .order("strike", { ascending: true }) // ATM-nearest strikes first
-      .limit(100); // Fetch up to 100 most recent contracts
+      .order("strike", { ascending: true })
+      .limit(100);
+
+    // Expiry-day fallback: primary query only returns 0 if the cleanup job deleted
+    // today's contracts AND next week's haven't been ingested yet (rare ~30 min window
+    // on Thursday morning). In that case, look back 7 days to find the most recently
+    // expired contracts — still bounded so we never pull months-old data.
+    if (!symbolsError && (!symbols || symbols.length === 0)) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      console.warn(`⚠️ No contracts with expiry >= ${today}, trying 7-day lookback (expiry >= ${sevenDaysAgo})...`);
+      ({ data: symbols, error: symbolsError } = await supabase
+        .from("bse_fo_symbols")
+        .select("symbol, instrument_token, underlying, instrument_type, expiry, strike, option_type")
+        .eq("underlying", "SENSEX")
+        .in("option_type", ["PE", "CE"])
+        .gte("expiry", sevenDaysAgo)   // bounded — never returns contracts older than 7 days
+        .order("expiry", { ascending: false })
+        .limit(100));
+    }
 
     if (symbolsError) {
-      console.error("❌ Error fetching SENSEX symbols:", symbolsError);
+      console.error("❌ Error fetching BSE F&O symbols:", symbolsError);
       return new Response(
-        JSON.stringify({ error: "Failed to fetch SENSEX symbols", details: symbolsError }),
+        JSON.stringify({ error: "Failed to fetch BSE F&O symbols", details: symbolsError }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
     if (!symbols || symbols.length === 0) {
-      console.log("⚠️ No active SENSEX PE/CE contracts found");
+      console.log("⚠️ No active BSE F&O PE/CE contracts found");
       return new Response(
-        JSON.stringify({ message: "No active SENSEX contracts", count: 0 }),
+        JSON.stringify({ message: "No active BSE F&O contracts", count: 0 }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
 
     console.log(`✅ Found ${symbols.length} active SENSEX contracts`);
 
-    // Step 2: Fetch 5-minute historical data for each contract
-    let successCount = 0;
-    let errorCount = 0;
+    // Step 2: Fetch 5-min candles for all contracts from Kite API,
+    // accumulate all records, then do a SINGLE batched upsert (avoids per-symbol DB calls).
+    let kiteErrorCount = 0;
+    const allRecords: object[] = [];
+    const todayStr = new Date().toISOString().split('T')[0]; // fetch full intraday day
 
     for (const symbolData of symbols as BseFoSymbol[]) {
       try {
-        // Calculate date range (last 50 candles = ~4 hours of 5-min data)
-        const toDate = new Date();
-        const fromDate = new Date(toDate.getTime() - 4 * 60 * 60 * 1000); // 4 hours ago
-
-        const kiteUrl = `https://api.kite.trade/instruments/historical/${symbolData.instrument_token}/5minute?from=${fromDate.toISOString().split('T')[0]}&to=${toDate.toISOString().split('T')[0]}`;
+        const kiteUrl = `https://api.kite.trade/instruments/historical/${symbolData.instrument_token}/5minute?from=${todayStr}&to=${todayStr}`;
 
         const response = await fetch(kiteUrl, {
           headers: {
@@ -114,7 +132,7 @@ Deno.serve(async (req) => {
 
         if (!response.ok) {
           console.error(`❌ Kite API error for ${symbolData.symbol}: ${response.status}`);
-          errorCount++;
+          kiteErrorCount++;
           continue;
         }
 
@@ -126,83 +144,74 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Step 3: Transform and insert into historical_prices_bse_fo
-        const historicalRecords = candles
-          .map((candle) => {
-            // Kite API returns: [timestamp, open, high, low, close, volume, oi]
-            const [dateStr, open, high, low, close, volume, oi] = candle;
-            const timestamp = new Date(dateStr);
-            
-            // Validate timestamp before proceeding
-            if (isNaN(timestamp.getTime())) {
-              console.warn(`⚠️ Invalid date for ${symbolData.symbol}: ${dateStr}`);
-              return null;
-            }
+        // Transform candles → DB records
+        for (const candle of candles) {
+          const [dateStr, open, high, low, close, volume, oi] = candle;
+          const timestamp = new Date(dateStr);
+          if (isNaN(timestamp.getTime())) continue; // skip invalid timestamps
 
-            const dateOnly = timestamp.toISOString().split('T')[0];
-            const timeOnly = timestamp.toTimeString().slice(0, 5); // HH:MM
-
-            return {
-              symbol: symbolData.symbol,
-              instrument_token: symbolData.instrument_token,
-              underlying: symbolData.underlying,
-              instrument_type: symbolData.instrument_type,
-              expiry: symbolData.expiry,
-              strike: symbolData.strike,
-              option_type: symbolData.option_type,
-              date: dateOnly,
-              timestamp: timestamp.toISOString(),
-              interval_type: "5min",
-              time: timeOnly,
-              open,
-              high,
-              low,
-              close,
-              volume,
-              open_interest: oi || null,
-            };
-          })
-          .filter((record) => record !== null); // Remove invalid records
-
-        // Skip if no valid records
-        if (historicalRecords.length === 0) {
-          console.log(`⚠️ No valid candles for ${symbolData.symbol} after filtering`);
-          continue;
-        }
-
-        // Upsert into database (ignore conflicts on symbol + timestamp)
-        const { error: insertError } = await supabase
-          .from("historical_prices_bse_fo")
-          .upsert(historicalRecords, {
-            onConflict: "symbol,timestamp",
-            ignoreDuplicates: true,
+          allRecords.push({
+            symbol: symbolData.symbol,
+            instrument_token: symbolData.instrument_token,
+            underlying: symbolData.underlying,
+            instrument_type: symbolData.instrument_type,
+            expiry: symbolData.expiry,
+            strike: symbolData.strike,
+            option_type: symbolData.option_type,
+            date: timestamp.toISOString().split('T')[0],
+            timestamp: timestamp.toISOString(),
+            interval_type: "5min",
+            time: timestamp.toTimeString().slice(0, 5),
+            open,
+            high,
+            low,
+            close,
+            volume,
+            open_interest: oi ?? null,
           });
-
-        if (insertError) {
-          console.error(`❌ Insert error for ${symbolData.symbol}:`, insertError.message);
-          errorCount++;
-        } else {
-          console.log(`✅ Inserted ${historicalRecords.length} candles for ${symbolData.symbol}`);
-          successCount++;
         }
 
-        // Rate limiting: wait 60ms between requests (max 1000 req/min from Kite)
+        // Rate limiting: 60ms between Kite requests (max ~1000 req/min)
         await new Promise((resolve) => setTimeout(resolve, 60));
-      } catch (error) {
-        console.error(`❌ Error processing ${symbolData.symbol}:`, error);
-        errorCount++;
+      } catch (err) {
+        console.error(`❌ Error fetching ${symbolData.symbol}:`, err);
+        kiteErrorCount++;
       }
     }
 
-    console.log(`✅ Auto-fetch complete: ${successCount} success, ${errorCount} errors`);
+    // Step 3: Single batched upsert — avoids N individual DB round-trips.
+    // NOTE: historical_prices_bse_fo needs a unique index on (symbol, timestamp)
+    // for ON CONFLICT to work. If not present, duplicates will be inserted.
+    // Run: CREATE UNIQUE INDEX IF NOT EXISTS idx_bse_fo_symbol_timestamp
+    //       ON historical_prices_bse_fo (symbol, timestamp);
+    let successCount = 0;
+    let dbErrorCount = 0;
+    const CHUNK_SIZE = 500;
+
+    for (let i = 0; i < allRecords.length; i += CHUNK_SIZE) {
+      const chunk = allRecords.slice(i, i + CHUNK_SIZE);
+      const { error: insertError } = await supabase
+        .from("historical_prices_bse_fo")
+        .upsert(chunk, { onConflict: "symbol,timestamp", ignoreDuplicates: true });
+
+      if (insertError) {
+        console.error(`❌ Batch insert error (chunk ${i / CHUNK_SIZE + 1}):`, insertError.message);
+        dbErrorCount++;
+      } else {
+        successCount += chunk.length;
+      }
+    }
+
+    console.log(`✅ Auto-fetch complete: ${successCount} candles saved | Kite errors: ${kiteErrorCount} | DB errors: ${dbErrorCount}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "SENSEX F&O auto-fetch completed",
+        message: "BSE F&O auto-fetch completed (SENSEX)",
         total_symbols: symbols.length,
-        success_count: successCount,
-        error_count: errorCount,
+        total_candles_saved: successCount,
+        kite_errors: kiteErrorCount,
+        db_errors: dbErrorCount,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );

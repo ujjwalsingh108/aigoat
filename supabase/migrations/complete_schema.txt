@@ -454,10 +454,9 @@ CREATE TABLE public.invoices (
 );
 CREATE TABLE public.kite_tokens (
   id bigint NOT NULL DEFAULT nextval('kite_tokens_id_seq'::regclass),
-  access_token text NOT NULL UNIQUE,
+  access_token text NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   expires_at timestamp with time zone NOT NULL,
-  is_active boolean DEFAULT true,
   CONSTRAINT kite_tokens_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.nse_equity_top_1000_symbols (

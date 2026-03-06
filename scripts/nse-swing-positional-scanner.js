@@ -56,6 +56,8 @@ class NseSwingPositionalScanner {
     this.aiFilter = new AiBreakoutFilter();
     this.symbols = [];
     this.dailyScanTimer = null;
+    // Bulk pre-fetched daily candles map — refreshed each scan run
+    this._bulkDaily = new Map();
   }
 
   async initialize() {
@@ -87,14 +89,23 @@ class NseSwingPositionalScanner {
 
   async scanAllSymbols() {
     const startTime = Date.now();
-    let bullishSignals = 0;
-    let bearishSignals = 0;
+    const bullishBatch = [];
+    const bearishBatch = [];
 
     console.log(`\n🔍 Starting NSE Swing Positional scan at ${new Date().toLocaleTimeString()}...`);
 
+    // ── BULK PRE-FETCH: 1000 symbols → 2 DB queries total ─────────────────────
+    const symbolList = this.symbols.map(s => s.symbol);
+    console.log(`📦 Bulk-fetching daily candles for ${symbolList.length} NSE swing symbols...`);
+    this._bulkDaily = await this.db.getBulkDailyCandles(
+      symbolList, 'historical_prices_nse_swing_hourly', 65 // 65 days → enough for EMA20 + SMA50
+    );
+    console.log(`✅ Bulk fetch done: ${this._bulkDaily.size} symbols with data`);
+    // ──────────────────────────────────────────────────────────────────────────
+
     for (const symbolData of this.symbols) {
       try {
-        const result = await this.analyzeSymbol(symbolData);
+        const result = this.analyzeSymbol(symbolData); // pure in-memory, no await needed
         
         if (result.bullish) {
           // AI validation for bullish swing signals
@@ -103,40 +114,33 @@ class NseSwingPositionalScanner {
             historicalCandles: result.dailyCandles 
           });
           
-          if (this.aiFilter.shouldSaveSignal(aiResult, 0.7)) { // 70% confidence for swing
-            const enrichedSignal = {
+          if (this.aiFilter.shouldSaveSignal(aiResult, 0.7)) {
+            bullishBatch.push({
               ...result.bullish,
               ai_verdict: aiResult.verdict,
               ai_confidence: aiResult.confidence,
               ai_reasoning: aiResult.reasoning,
               ai_risk_factors: aiResult.risk_factors || null,
               ai_validated: aiResult.ai_validated,
-            };
-            
-            await this.db.saveBullishSignal(enrichedSignal, 'nse_swing_positional_bullish');
-            bullishSignals++;
+            });
           }
         }
         
         if (result.bearish) {
-          // AI validation for bearish swing signals
           const aiResult = await this.aiFilter.validateBreakout(result.bearish, { 
             patterns: result.patterns, 
             historicalCandles: result.dailyCandles 
           });
           
           if (this.aiFilter.shouldSaveSignal(aiResult, 0.7)) {
-            const enrichedSignal = {
+            bearishBatch.push({
               ...result.bearish,
               ai_verdict: aiResult.verdict,
               ai_confidence: aiResult.confidence,
               ai_reasoning: aiResult.reasoning,
               ai_risk_factors: aiResult.risk_factors || null,
               ai_validated: aiResult.ai_validated,
-            };
-            
-            await this.db.saveBearishSignal(enrichedSignal, 'nse_swing_positional_bearish');
-            bearishSignals++;
+            });
           }
         }
       } catch (error) {
@@ -146,28 +150,29 @@ class NseSwingPositionalScanner {
       }
     }
 
+    // ── BATCH SAVE: all signals in 1-2 DB round-trips ─────────────────────────
+    if (bullishBatch.length > 0) {
+      await this.db.saveBulkSignals(bullishBatch, 'nse_swing_positional_bullish');
+    }
+    if (bearishBatch.length > 0) {
+      await this.db.saveBulkSignals(bearishBatch, 'nse_swing_positional_bearish');
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     const duration = Date.now() - startTime;
-    const totalSignals = bullishSignals + bearishSignals;
+    const totalSignals = bullishBatch.length + bearishBatch.length;
     
     this.monitor.recordScan(duration, totalSignals);
-    console.log(`✅ Swing scan complete: ${bullishSignals} bullish, ${bearishSignals} bearish | ${duration}ms`);
-    
-    // Log AI stats
+    console.log(`✅ Swing scan complete: ${bullishBatch.length} bullish, ${bearishBatch.length} bearish | ${duration}ms`);
     this.aiFilter.logStats();
   }
 
-  async analyzeSymbol(symbolData) {
+  analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch daily candles with cache (60 days to ensure 50+ for SMA50)
-    const cacheKey = `nse_swing_daily_${symbol}_60`;
-    let dailyCandles = cache.get(cacheKey);
-    
-    if (!dailyCandles) {
-      dailyCandles = await this.db.getDailyCandles(symbol, 'historical_prices_nse_swing_hourly', 60);
-      // Cache for 23 hours (refreshes before next daily scan)
-      cache.set(cacheKey, dailyCandles, 82800);
-    }
+    // ── READ FROM BULK PRE-FETCHED MAP (zero DB queries) ──────────────────────
+    const dailyCandles = this._bulkDaily.get(symbol) || [];
+    // ──────────────────────────────────────────────────────────────────────────
 
     if (dailyCandles.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
       return { bullish: null, bearish: null, patterns: null, dailyCandles };

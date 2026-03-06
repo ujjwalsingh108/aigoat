@@ -52,6 +52,9 @@ class NseFoScanner {
     this.symbols = [];
     this.scanInterval = null;
     this.cleanupInterval = null;
+    // Bulk pre-fetched data map (refreshed each scan cycle)
+    this._bulkHistorical = new Map();
+    this._bulkFetchedAt = 0;
   }
 
   async initialize() {
@@ -88,6 +91,22 @@ class NseFoScanner {
 
     console.log(`\n🔍 Starting NSE F&O scan at ${new Date().toLocaleTimeString()}...`);
     console.log(`📊 Analyzing ${this.symbols.length} symbols...`);
+
+    // ── BULK PRE-FETCH (replaces per-symbol queries) ──────────────────────────
+    const now = Date.now();
+    const BULK_TTL_MS = 5 * 60 * 1000; // 5 minutes
+    if (now - this._bulkFetchedAt >= BULK_TTL_MS) {
+      const symbolList = this.symbols.map(s => s.symbol);
+      console.log(`📦 Bulk-fetching F&O historical data for ${symbolList.length} symbols...`);
+      this._bulkHistorical = await this.db.getBulkHistoricalData(
+        symbolList, 'historical_prices_nse_fo', 50, 260
+      );
+      this._bulkFetchedAt = Date.now();
+      console.log(`✅ Bulk fetch done: ${this._bulkHistorical.size} F&O symbols with data`);
+    } else {
+      console.log(`⚡ Using cached F&O bulk data (age: ${Math.round((now - this._bulkFetchedAt)/1000)}s)`);
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     for (const symbolData of this.symbols) {
       try {
@@ -136,15 +155,9 @@ class NseFoScanner {
   async analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch 5-min historical data with cache
-    const historicalCacheKey = `nse_fo_hist_${symbol}_50`;
-    let historical = cache.get(historicalCacheKey);
-    
-    if (!historical) {
-      historical = await this.db.getNseFoHistoricalData(symbol, 50);
-      // Cache for 5 minutes (gets fresh data every few scans)
-      cache.set(historicalCacheKey, historical, 300);
-    }
+    // ── READ FROM BULK PRE-FETCHED DATA (zero extra DB queries) ─────────────
+    const historical = this._bulkHistorical.get(symbol) || [];
+    // ────────────────────────────────────────────────────────────────────────
 
     if (historical.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
       // Log all skips temporarily for debugging
@@ -327,10 +340,14 @@ class NseFoScanner {
   async start() {
     console.log("🚀 Starting NSE F&O Scanner (Batch Mode)...");
 
-    const initialized = await this.initialize();
-    if (!initialized) {
-      console.error("❌ Failed to initialize scanner. Exiting.");
-      process.exit(1);
+    // Retry initialization instead of process.exit — handles expiry-day
+    // where new contracts aren't available yet (e.g. Thursday morning before 8:30 AM IST)
+    let initialized = await this.initialize();
+    while (!initialized) {
+      const retryDelay = 5 * 60 * 1000; // 5 minutes
+      console.warn(`⏳ Init failed (no F&O symbols). Retrying in 5 minutes...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      initialized = await this.initialize();
     }
 
     // Run immediate scan

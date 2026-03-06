@@ -3,7 +3,6 @@ import React, { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Activity,
@@ -30,37 +29,23 @@ export default function BSEFOPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
-  const supabase = createClient();
-
-  // Load BSE F&O signals (SENSEX, etc.)
+  // Load BSE F&O signals via cached API route
   const loadSignals = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      const { data, error } = await supabase
-        .from("bse_fo_signals")
-        .select("*")
-        .eq("is_active", true)
-        .gte(
-          "created_at",
-          new Date(Date.now() - 15 * 60 * 1000).toISOString()
-        )
-        .gte("probability", 0.6)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const res = await fetch("/api/signals/bse-fo?minutesAgo=15&minProbability=0.6&limit=50");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
 
-      if (error) {
-        console.error("Error loading BSE F&O signals:", error);
-      } else {
-        setSignals(data || []);
-        setLastUpdate(new Date());
-      }
+      setSignals(json.data?.all || []);
+      setLastUpdate(new Date());
     } catch (err) {
       console.error("Exception loading BSE F&O signals:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   // Initial load
   useEffect(() => {

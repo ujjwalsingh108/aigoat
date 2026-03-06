@@ -57,12 +57,24 @@ class FoDatabaseClient {
       console.log("📊 Fetching BSE F&O instruments...");
 
       // Get futures + options for SENSEX, BANKEX
-      const { data, error } = await this.supabase
-        .from("kite_bse_fo_symbols")
+      const today = new Date().toISOString().split('T')[0];
+      let { data, error } = await this.supabase
+        .from("bse_fo_symbols")
         .select("symbol, instrument_token, underlying, instrument_type, expiry, strike, option_type")
-        .eq("is_active", true)
         .in("underlying", CONFIG.FOCUS_UNDERLYINGS)
+        .gte("expiry", today)
         .order("expiry", { ascending: true });
+
+      // Expiry-day fallback: if 0 results, drop the expiry filter
+      if (!error && (!data || data.length === 0)) {
+        console.warn(`⚠️ No BSE F&O symbols with expiry >= ${today}, trying without expiry filter (expiry-day fallback)...`);
+        ({ data, error } = await this.supabase
+          .from("bse_fo_symbols")
+          .select("symbol, instrument_token, underlying, instrument_type, expiry, strike, option_type")
+          .in("underlying", CONFIG.FOCUS_UNDERLYINGS)
+          .order("expiry", { ascending: false })
+          .limit(500));
+      }
 
       if (error) throw error;
 
@@ -125,6 +137,72 @@ class FoDatabaseClient {
     } catch (error) {
       console.error(`❌ Error fetching historical data for ${symbol}:`, error.message);
       return [];
+    }
+  }
+
+  /**
+   * BULK fetch the single latest candle for multiple option symbols in ONE query.
+   * Returns a Map<symbol, candle>.
+   */
+  async getBulkLatestCandles(symbols) {
+    if (!symbols || symbols.length === 0) return new Map();
+    try {
+      const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // last 2 hours
+      const { data, error } = await this.supabase
+        .from("historical_prices_bse_fo")
+        .select("symbol, date, time, timestamp, open, high, low, close, volume, oi")
+        .in("symbol", symbols)
+        .gte("timestamp", since)
+        .order("timestamp", { ascending: false })
+        .limit(symbols.length * 20); // ~20 candles per symbol in 2h window is enough
+
+      if (error) throw error;
+
+      // Keep only the latest candle per symbol
+      const latestMap = new Map();
+      for (const row of (data || [])) {
+        if (!latestMap.has(row.symbol)) {
+          latestMap.set(row.symbol, row); // already sorted desc, first = latest
+        }
+      }
+      return latestMap;
+    } catch (error) {
+      console.error(`❌ Error bulk-fetching BSE FO latest candles:`, error.message);
+      return new Map();
+    }
+  }
+
+  /**
+   * BULK fetch full historical data (50 candles) for multiple symbols in ONE query.
+   * Returns a Map<symbol, candle[]> (ascending by timestamp).
+   */
+  async getBulkHistoricalData(symbols, limit = 50) {
+    if (!symbols || symbols.length === 0) return new Map();
+    try {
+      const since = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(); // last 5 hours
+      const { data, error } = await this.supabase
+        .from("historical_prices_bse_fo")
+        .select("symbol, date, time, timestamp, open, high, low, close, volume")
+        .in("symbol", symbols)
+        .gte("timestamp", since)
+        .order("timestamp", { ascending: true })
+        .limit(symbols.length * limit);
+
+      if (error) throw error;
+
+      const grouped = new Map();
+      for (const row of (data || [])) {
+        if (!grouped.has(row.symbol)) grouped.set(row.symbol, []);
+        grouped.get(row.symbol).push(row);
+      }
+      // Trim each to last `limit` candles
+      for (const [sym, candles] of grouped) {
+        if (candles.length > limit) grouped.set(sym, candles.slice(-limit));
+      }
+      return grouped;
+    } catch (error) {
+      console.error(`❌ Error bulk-fetching BSE FO historical data:`, error.message);
+      return new Map();
     }
   }
 
@@ -310,6 +388,10 @@ class BseFoScanner {
     this.kite = null;
     this.instruments = [];
     this.scanInterval = null;
+    // Bulk pre-fetched data maps (refreshed every 5 minutes)
+    this._bulkHistMap = new Map();
+    this._latestCandlesMap = new Map();
+    this._bulkFetchedAt = 0;
   }
 
   async initialize() {
@@ -355,7 +437,7 @@ class BseFoScanner {
     return Math.round(price / strikeInterval) * strikeInterval;
   }
 
-  async selectBestOption(underlying, signalDirection, indexPrice) {
+  async selectBestOption(underlying, signalDirection, indexPrice, latestCandlesMap) {
     // Find ATM strike
     const atmStrike = this.findATMStrike(indexPrice, 100);
     
@@ -378,39 +460,30 @@ class BseFoScanner {
 
     if (candidates.length === 0) return null;
 
-    // Get latest data for all candidates from historical database
-    try {
-      // Select strike with highest OI that meets threshold
-      let bestOption = null;
-      let highestOI = 0;
+    // Use pre-fetched bulk candle map (no extra DB calls)
+    let bestOption = null;
+    let highestOI = 0;
 
-      for (const candidate of candidates) {
-        // Get latest historical data for this option
-        const optionHistory = await this.db.getHistoricalData(candidate.symbol, 1);
-        
-        if (optionHistory.length === 0) continue;
+    for (const candidate of candidates) {
+      const latestCandle = latestCandlesMap.get(candidate.symbol);
+      if (!latestCandle) continue;
 
-        const latestCandle = optionHistory[0];
-        const oi = parseInt(latestCandle.oi || 0);
-        const oiChange = parseInt(latestCandle.volume || 0);
+      const oi = parseInt(latestCandle.oi || 0);
+      const oiChange = parseInt(latestCandle.volume || 0);
 
-        if (oi >= CONFIG.MIN_OI_THRESHOLD && oi > highestOI) {
-          highestOI = oi;
-          bestOption = {
-            ...candidate,
-            entry_price: parseFloat(latestCandle.close),
-            open_interest: oi,
-            oi_change: oiChange,
-            implied_volatility: 0, // Set to 0 or calculate if IV data available
-          };
-        }
+      if (oi >= CONFIG.MIN_OI_THRESHOLD && oi > highestOI) {
+        highestOI = oi;
+        bestOption = {
+          ...candidate,
+          entry_price: parseFloat(latestCandle.close),
+          open_interest: oi,
+          oi_change: oiChange,
+          implied_volatility: 0,
+        };
       }
-
-      return bestOption;
-    } catch (error) {
-      console.error(`❌ Error fetching option quotes for ${underlying}:`, error.message);
-      return null;
     }
+
+    return bestOption;
   }
 
   async scanForSignals() {
@@ -418,23 +491,58 @@ class BseFoScanner {
 
     const signals = [];
 
+    // ── BULK PRE-FETCH with 5-minute TTL (reduces DB queries by ~12×) ────────
+    const now = new Date();
+    const BULK_TTL_MS = 5 * 60 * 1000; // 5 minutes
+    if (Date.now() - this._bulkFetchedAt >= BULK_TTL_MS) {
+      // 1. Build futures symbol names dynamically for current month
+      const yy = String(now.getFullYear()).slice(-2);
+      const mon = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const futuresSymbols = CONFIG.FOCUS_UNDERLYINGS.map(u => `${u}${yy}${mon}FUT`);
+
+      // 2. Fetch underlying+futures historical data in one bulk call
+      const allFetchSymbols = [...CONFIG.FOCUS_UNDERLYINGS, ...futuresSymbols];
+
+      // 3. Fetch latest candle for ALL option instruments in one call
+      const allOptionSymbols = this.instruments
+        .filter(i => i.instrument_type === 'OPT')
+        .map(i => i.symbol);
+
+      [this._bulkHistMap, this._latestCandlesMap] = await Promise.all([
+        this.db.getBulkHistoricalData(allFetchSymbols, 50),
+        this.db.getBulkLatestCandles(allOptionSymbols),
+      ]);
+
+      this._bulkFetchedAt = Date.now();
+      console.log(`📦 Bulk fetched (cache refreshed): ${this._bulkHistMap.size} hist series, ${this._latestCandlesMap.size} option candles`);
+    } else {
+      const ageSeconds = Math.round((Date.now() - this._bulkFetchedAt) / 1000);
+      console.log(`📦 Using cached bulk data (age: ${ageSeconds}s / 300s TTL)`);
+    }
+    const bulkHistMap = this._bulkHistMap;
+    const latestCandlesMap = this._latestCandlesMap;
+    // ─────────────────────────────────────────────────────────────────────────
+
     for (const underlying of CONFIG.FOCUS_UNDERLYINGS) {
       try {
-        // Get current index price
-        const indexPrice = await this.getUnderlyingPrice(underlying);
-        if (!indexPrice) {
+        // Get current index price from pre-fetched map
+        const underlyingCandles = bulkHistMap.get(underlying) || [];
+        if (underlyingCandles.length === 0) {
           console.log(`⚠️ Could not fetch ${underlying} price`);
           continue;
         }
+        const indexPrice = parseFloat(underlyingCandles[underlyingCandles.length - 1].close);
 
         console.log(`📊 ${underlying}: ${indexPrice.toFixed(2)}`);
 
-        // Get historical data for the underlying futures
-        const futuresSymbol = `${underlying}26JANFUT`; // Adjust month dynamically in production
-        const historicalData = await this.db.getHistoricalData(futuresSymbol, 50);
+        // Get futures historical data from pre-fetched map
+        const yy = String(now.getFullYear()).slice(-2);
+        const mon = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+        const futuresSymbol = `${underlying}${yy}${mon}FUT`;
+        const historicalData = bulkHistMap.get(futuresSymbol) || [];
 
         if (historicalData.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS) {
-          console.log(`⚠️ Insufficient historical data for ${underlying}`);
+          console.log(`⚠️ Insufficient historical data for ${underlying} (got ${historicalData.length} candles)`);
           continue;
         }
 
@@ -452,11 +560,12 @@ class BseFoScanner {
 
         console.log(`   ✅ ${indexSignal.signal_direction} signal for ${underlying}`);
 
-        // Find best option contract
+        // Find best option contract (uses pre-fetched latestCandlesMap, zero extra DB calls)
         const bestOption = await this.selectBestOption(
           underlying,
           indexSignal.signal_direction,
-          indexPrice
+          indexPrice,
+          latestCandlesMap
         );
 
         if (!bestOption) {

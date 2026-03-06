@@ -51,6 +51,10 @@ class BseEquityScanner {
     this.symbols = [];
     this.scanInterval = null;
     this.cleanupInterval = null;
+    // Bulk pre-fetched data maps (refreshed each scan cycle)
+    this._bulkHistorical = new Map();
+    this._bulkDaily = new Map();
+    this._bulkFetchedAt = 0;
   }
 
   async initialize() {
@@ -84,6 +88,23 @@ class BseEquityScanner {
     let bearishSignals = 0;
 
     console.log(`\n🔍 Starting BSE Equity scan at ${new Date().toLocaleTimeString()}...`);
+
+    // ── BULK PRE-FETCH (replaces per-symbol queries) ──────────────────────────
+    const now = Date.now();
+    const BULK_TTL_MS = 5 * 60 * 1000; // 5 minutes
+    if (now - this._bulkFetchedAt >= BULK_TTL_MS) {
+      const symbolList = this.symbols.map(s => s.symbol);
+      console.log(`📦 Bulk-fetching historical data for ${symbolList.length} symbols...`);
+      [this._bulkHistorical, this._bulkDaily] = await Promise.all([
+        this.db.getBulkHistoricalData(symbolList, 'historical_prices_bse_equity', 50, 260),
+        this.db.getBulkDailyCandles(symbolList, 'historical_prices_bse_equity', 30),
+      ]);
+      this._bulkFetchedAt = Date.now();
+      console.log(`✅ Bulk fetch done: ${this._bulkHistorical.size} symbols with 5-min data, ${this._bulkDaily.size} with daily data`);
+    } else {
+      console.log(`⚡ Using cached bulk data (age: ${Math.round((now - this._bulkFetchedAt)/1000)}s)`);
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     for (const symbolData of this.symbols) {
       try {
@@ -192,24 +213,10 @@ class BseEquityScanner {
   async analyzeSymbol(symbolData) {
     const symbol = symbolData.symbol;
 
-    // Fetch historical and daily data with cache
-    const historicalCacheKey = `bse_eq_hist_${symbol}_50`;
-    const dailyCacheKey = `bse_eq_daily_${symbol}_365`;
-    
-    let historical = cache.get(historicalCacheKey);
-    let daily = cache.get(dailyCacheKey);
-    
-    if (!historical || !daily) {
-      [historical, daily] = await Promise.all([
-        this.db.getHistoricalData(symbol, 'historical_prices_bse_equity', 50),
-        this.db.getDailyCandles(symbol, 'historical_prices_bse_equity', 20),
-      ]);
-      
-      // Cache 5-min data for 5 minutes (gets fresh data every few scans)
-      cache.set(historicalCacheKey, historical, 300);
-      // Cache daily data for 1 hour (doesn't change intraday)
-      cache.set(dailyCacheKey, daily, 3600);
-    }
+    // ── READ FROM BULK PRE-FETCHED DATA (zero extra DB queries) ─────────────
+    let historical = this._bulkHistorical.get(symbol) || [];
+    let daily = this._bulkDaily.get(symbol) || [];
+    // ────────────────────────────────────────────────────────────────────────
 
     if (historical.length < CONFIG.MIN_CANDLES_FOR_ANALYSIS || daily.length === 0) {
       return { bullish: null, bearish: null, historical, patterns: null };

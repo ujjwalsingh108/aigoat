@@ -1,12 +1,11 @@
-// NSE F&O NIFTY + BANKNIFTY Symbols Sync Edge Function
-// Fetches NEW active NIFTY and BANKNIFTY contracts from Kite and stores them in nse_fo_symbols
+// BSE F&O SENSEX Symbols Sync Edge Function
+// Fetches NEW active SENSEX contracts from Kite and stores them in bse_fo_symbols
 // Also marks expired contracts as is_active = false
 // Run daily (e.g. 8:00 AM IST) to keep contract list updated
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const KITE_API_KEY = Deno.env.get("KITE_API_KEY")!;
-
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -16,19 +15,15 @@ interface KiteInstrument {
   tradingsymbol: string;
   name: string;
   last_price: number;
-  expiry: string; // "2024-02-29"
+  expiry: string; // "2026-02-26"
   strike: number;
   tick_size: number;
   lot_size: number;
   instrument_type: string; // "CE", "PE", "FUT"
-  segment: string; // "NFO-FUT", "NFO-OPT"
-  exchange: string; // "NFO"
+  segment: string;         // "BFO-FUT", "BFO-OPT"
+  exchange: string;        // "BFO"
 }
 
-/**
- * Fetches the Kite access token from the kite_tokens table
- * Returns the most recent non-expired token
- */
 async function getKiteAccessToken(supabase: any): Promise<string> {
   const { data, error } = await supabase
     .from("kite_tokens")
@@ -41,12 +36,9 @@ async function getKiteAccessToken(supabase: any): Promise<string> {
     throw new Error(`Failed to fetch Kite access token: ${error?.message || "No token found"}`);
   }
 
-  // Check if token is expired
   const expiresAt = new Date(data.expires_at);
-  const now = new Date();
-  
-  if (now >= expiresAt) {
-    throw new Error("Kite access token has expired. Please refresh the token.");
+  if (new Date() >= expiresAt) {
+    throw new Error(`Kite access token expired at ${expiresAt.toISOString()}`);
   }
 
   console.log(`✅ Using Kite access token (expires: ${expiresAt.toISOString()})`);
@@ -55,18 +47,14 @@ async function getKiteAccessToken(supabase: any): Promise<string> {
 
 Deno.serve(async (req) => {
   try {
-    console.log("🚀 Starting NSE F&O NIFTY + BANKNIFTY symbols sync...");
+    console.log("🚀 Starting BSE F&O SENSEX symbols sync...");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-    // Fetch Kite access token from database
     const KITE_ACCESS_TOKEN = await getKiteAccessToken(supabase);
 
-    // Step 1: Fetch all instruments from Kite API
-    console.log("📥 Fetching instruments from Kite API...");
-    const kiteUrl = "https://api.kite.trade/instruments/NFO";
-
-    const response = await fetch(kiteUrl, {
+    // Step 1: Fetch all BFO instruments from Kite API (returns CSV)
+    console.log("📥 Fetching BFO instruments from Kite API...");
+    const response = await fetch("https://api.kite.trade/instruments/BFO", {
       headers: {
         "X-Kite-Version": "3",
         Authorization: `token ${KITE_API_KEY}:${KITE_ACCESS_TOKEN}`,
@@ -76,16 +64,16 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       console.error(`❌ Kite API error: ${response.status}`);
       return new Response(
-        JSON.stringify({ error: "Failed to fetch instruments from Kite API", status: response.status }),
+        JSON.stringify({ error: "Failed to fetch BFO instruments from Kite", status: response.status }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
+    // Parse CSV response
     const csvText = await response.text();
     const lines = csvText.trim().split("\n");
     const headers = lines[0].split(",");
 
-    // Parse CSV to JSON
     const instruments: KiteInstrument[] = [];
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(",");
@@ -96,43 +84,42 @@ Deno.serve(async (req) => {
       instruments.push(instrument as KiteInstrument);
     }
 
-    console.log(`✅ Fetched ${instruments.length} total NFO instruments`);
+    console.log(`✅ Fetched ${instruments.length} total BFO instruments`);
 
-    // Step 2: Filter for NIFTY and BANKNIFTY CE/PE/FUT contracts that have not expired
-    const UNDERLYINGS = ["NIFTY", "BANKNIFTY"];
+    // Step 2: Filter for SENSEX CE/PE/FUT contracts that have not expired
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const activeContracts = instruments.filter((inst) => {
+    const sensexContracts = instruments.filter((inst) => {
       const tradingsymbol = inst.tradingsymbol || "";
-      const underlying = tradingsymbol.split(/\d/)[0]; // "NIFTY" or "BANKNIFTY"
+      // SENSEX tradingsymbols: "SENSEX26FEB80000CE", "SENSEX26FEBFUT"
+      // Split on first digit to extract underlying prefix
+      const underlying = tradingsymbol.split(/\d/)[0];
 
       return (
-        UNDERLYINGS.includes(underlying) &&
-        inst.exchange === "NFO" &&
+        underlying === "SENSEX" &&
+        inst.exchange === "BFO" &&
         ["CE", "PE", "FUT"].includes(inst.instrument_type) &&
         inst.expiry &&
         new Date(inst.expiry) >= today
       );
     });
 
-    const niftyCount = activeContracts.filter(i => i.tradingsymbol.split(/\d/)[0] === "NIFTY").length;
-    const bankNiftyCount = activeContracts.filter(i => i.tradingsymbol.split(/\d/)[0] === "BANKNIFTY").length;
-    console.log(`✅ Filtered ${activeContracts.length} active contracts — NIFTY: ${niftyCount}, BANKNIFTY: ${bankNiftyCount}`);
+    console.log(`✅ Filtered ${sensexContracts.length} active SENSEX contracts (CE/PE/FUT)`);
 
-    if (activeContracts.length === 0) {
-      console.warn("⚠️ No NIFTY/BANKNIFTY contracts found");
+    if (sensexContracts.length === 0) {
+      console.warn("⚠️ No SENSEX contracts found in BFO instruments");
       return new Response(
-        JSON.stringify({ message: "No active contracts found", count: 0 }),
+        JSON.stringify({ message: "No SENSEX contracts found", count: 0 }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Step 3: Get existing instrument tokens + expiry for both underlyings in ONE query
+    // Step 3: Get existing instrument tokens from bse_fo_symbols
     const { data: existingSymbols, error: fetchError } = await supabase
-      .from("nse_fo_symbols")
+      .from("bse_fo_symbols")
       .select("instrument_token, expiry, is_active")
-      .in("underlying", UNDERLYINGS);
+      .eq("underlying", "SENSEX");
 
     if (fetchError) {
       console.error("❌ Error fetching existing symbols:", fetchError);
@@ -145,32 +132,33 @@ Deno.serve(async (req) => {
     const existingTokens = new Set(
       (existingSymbols || []).map((s: any) => s.instrument_token)
     );
-    console.log(`✅ Found ${existingTokens.size} existing contracts in database (NIFTY + BANKNIFTY)`);
+    console.log(`✅ Found ${existingTokens.size} existing SENSEX contracts in database`);
 
     // Step 4: Mark expired contracts as is_active = false
+    // Any row in DB whose expiry < today AND is still marked active
     const expiredTokens = (existingSymbols || [])
       .filter((s: any) => s.is_active && new Date(s.expiry) < today)
       .map((s: any) => s.instrument_token);
 
     if (expiredTokens.length > 0) {
       const { error: deactivateError } = await supabase
-        .from("nse_fo_symbols")
+        .from("bse_fo_symbols")
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .in("instrument_token", expiredTokens);
 
       if (deactivateError) {
         console.error("❌ Error deactivating expired contracts:", deactivateError.message);
       } else {
-        console.log(`✅ Marked ${expiredTokens.length} expired contracts as inactive`);
+        console.log(`✅ Marked ${expiredTokens.length} expired SENSEX contracts as inactive`);
       }
     }
 
-    // Step 5 (was 4): Filter for NEW contracts only
-    const newContracts = activeContracts.filter(
+    // Step 5: Filter for NEW contracts not yet in DB
+    const newContracts = sensexContracts.filter(
       (contract) => !existingTokens.has(contract.instrument_token)
     );
 
-    console.log(`✅ Found ${newContracts.length} NEW contracts to insert`);
+    console.log(`✅ Found ${newContracts.length} NEW SENSEX contracts to insert`);
 
     if (newContracts.length === 0) {
       console.log("✅ No new contracts to add. Database is up-to-date.");
@@ -178,7 +166,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           message: "No new contracts. Database is up-to-date.",
-          total_contracts: activeContracts.length,
+          total_sensex_contracts: sensexContracts.length,
           existing_contracts: existingTokens.size,
           new_contracts: 0,
           deactivated_contracts: expiredTokens.length,
@@ -187,16 +175,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Default lot sizes per underlying (used only if Kite CSV has 0/empty)
-    const DEFAULT_LOT_SIZES: Record<string, number> = {
-      NIFTY: 25,
-      BANKNIFTY: 15,
-    };
-
-    // Step 6: Transform and insert NEW contracts
+    // Step 6: Transform and insert NEW contracts in batches
     const recordsToInsert = newContracts.map((contract) => {
       const tradingsymbol = contract.tradingsymbol || "";
-      const underlying = tradingsymbol.split(/\d/)[0]; // "NIFTY" or "BANKNIFTY"
+      const underlying = tradingsymbol.split(/\d/)[0]; // "SENSEX"
       const optionType =
         contract.instrument_type === "CE" || contract.instrument_type === "PE"
           ? contract.instrument_type
@@ -205,38 +187,36 @@ Deno.serve(async (req) => {
       return {
         symbol: tradingsymbol,
         instrument_token: contract.instrument_token,
-        exchange: "NFO",
-        segment: contract.segment || (optionType ? "NFO-OPT" : "NFO-FUT"),
+        exchange: "BFO",
+        segment: contract.segment || (optionType ? "BFO-OPT" : "BFO-FUT"),
         instrument_type: contract.instrument_type,
         underlying,
         expiry: contract.expiry,
         strike: contract.strike ? Number(contract.strike) : null,
         option_type: optionType,
-        lot_size: contract.lot_size ? parseInt(contract.lot_size as any, 10) : (DEFAULT_LOT_SIZES[underlying] ?? 25),
+        lot_size: contract.lot_size ? parseInt(contract.lot_size as any, 10) : 10, // SENSEX default lot: 10
         tick_size: contract.tick_size ? Number(contract.tick_size) : 0.05,
         company_name: contract.name || null,
         is_active: true,
       };
     });
 
-    // Insert in batches of 500 to avoid payload limits
-    const batchSize = 500;
+    const BATCH_SIZE = 500;
     let insertedCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < recordsToInsert.length; i += batchSize) {
-      const batch = recordsToInsert.slice(i, i + batchSize);
-
+    for (let i = 0; i < recordsToInsert.length; i += BATCH_SIZE) {
+      const batch = recordsToInsert.slice(i, i + BATCH_SIZE);
       const { error: insertError } = await supabase
-        .from("nse_fo_symbols")
+        .from("bse_fo_symbols")
         .insert(batch);
 
       if (insertError) {
-        console.error(`❌ Batch insert error:`, insertError.message);
+        console.error(`❌ Batch insert error (batch ${i / BATCH_SIZE + 1}):`, insertError.message);
         errorCount += batch.length;
       } else {
         insertedCount += batch.length;
-        console.log(`✅ Inserted batch ${i / batchSize + 1}: ${batch.length} contracts`);
+        console.log(`✅ Inserted batch ${i / BATCH_SIZE + 1}: ${batch.length} contracts`);
       }
     }
 
@@ -245,10 +225,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: "NIFTY + BANKNIFTY symbols sync completed",
-        total_contracts: activeContracts.length,
-        nifty_contracts: niftyCount,
-        banknifty_contracts: bankNiftyCount,
+        message: "SENSEX symbols sync completed",
+        total_sensex_contracts: sensexContracts.length,
         existing_contracts: existingTokens.size,
         new_contracts_found: newContracts.length,
         inserted: insertedCount,

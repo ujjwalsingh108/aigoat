@@ -32,6 +32,7 @@ export const CACHE_KEYS = {
   SWING_POSITIONAL_BEARISH_SIGNALS: 'signals:swing-positional-bearish',
   INTRADAY_INDEX_SIGNALS: 'signals:intraday-index',
   SWING_INDEX_SIGNALS: 'signals:swing-index',
+  BSE_FO_SIGNALS: 'signals:bse-fo',
   NSE_SYMBOLS: 'symbols:nse',
   KITE_TOKEN: 'kite:token',
   DAILY_CANDLES: 'historical:daily',
