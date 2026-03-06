@@ -141,7 +141,7 @@ async function fetchSymbolData(
     const { error } = await supabase
       .from("historical_prices_nse_swing_hourly")
       .upsert(dataToInsert, {
-        onConflict: "symbol,date",
+        onConflict: "symbol,timestamp",
         ignoreDuplicates: false,
       });
 
