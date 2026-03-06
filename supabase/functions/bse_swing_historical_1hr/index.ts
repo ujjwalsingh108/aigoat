@@ -181,7 +181,8 @@ async function processAllSymbols() {
     console.log(`📊 Processing ${symbols.length} BSE equity symbols (hourly data)...`);
 
     // Process symbols in batches to avoid overwhelming the API
-    const batchSize = 5;
+    // batchSize=10 + 200ms delay → ~100 batches × ~1s = ~100s, well within 150s edge fn limit
+    const batchSize = 10;
     for (let i = 0; i < symbols.length; i += batchSize) {
       const batch = symbols.slice(i, i + batchSize);
 
@@ -221,9 +222,9 @@ async function processAllSymbols() {
 
       await Promise.all(batchPromises);
 
-      // Rate limiting: 1 second delay between batches (Kite has rate limits)
+      // Rate limiting: 200ms delay between batches (Kite allows 10 req/s)
       if (i + batchSize < symbols.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
     }
 
@@ -267,7 +268,7 @@ async function logExecution(result: any) {
         errors: result.errors,
       },
       config: {
-        batchSize: 5,
+        batchSize: 10,
         totalSymbols: result.totalSymbols,
         interval: "hourly",
         provider: "zerodha_kite",
